@@ -134,6 +134,7 @@ async def main(args):
     sdk_id = factory.getSdkId()
 
     # Get study config data from API required to initialize DFX SDK collector (or FAIL)
+    # TODO: Handle 404 properly here...
     async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
         response = await dfxapi.Studies.retrieve_study_config_hash(session, config["selected_study"], sdk_id)
         if response["MD5Hash"] != config["study_cfg_hash"]:
@@ -154,7 +155,8 @@ async def main(args):
         print(f"DFX collector creation failed: {collector.getLastErrorMessage()}")
         return
 
-    chunk_duration_s = 5.01  # TODO: Get from command line
+    print("Created DFX Collector:")
+    chunk_duration_s = float(args.chunk_duration_s)
     frames_per_chunk = math.ceil(chunk_duration_s * fps)
     number_chunks = math.ceil(frames_to_process / frames_per_chunk)
 
@@ -229,11 +231,10 @@ async def main(args):
                     frame_number += 1
 
                     # Rendering
-                    render_every = 1  # TODO: Read from command line
-                    if render_every and frame_number % render_every == 0:
+                    if not args.no_render:
                         render_image = np.copy(image)
-                        draw_on_image(dfx_frame, render_image, args.video_path, frame_number, frames_to_process, fps,
-                                      True, None, None)
+                        draw_on_image(dfx_frame, render_image, os.path.basename(args.video_path), frame_number,
+                                      frames_to_process, fps, True, None, None)
 
                         cv2.imshow("d", render_image)
                         cv2.waitKey(1)
@@ -259,10 +260,9 @@ async def main(args):
                     print(f"Sent chunk {chunk.chunk_number}")
 
                     # Save chunk (for debugging purposes)
-                    save_chunks_for_debug = False  # TODO: Read from command line
-                    if save_chunks_for_debug:
-                        save_chunk(chunk, "chunks")
-                        print(f"Saved chunk {chunk.chunk_number} in 'chunks' folder")
+                    if args.debug_save_chunks_path:
+                        save_chunk(chunk, args.debug_save_chunks_path)
+                        print(f"Saved chunk {chunk.chunk_number} in '{args.debug_save_chunks_path}'")
 
                     chunk_queue.task_done()
 
@@ -503,6 +503,9 @@ def cmdline():
                                                                                           required=True)
     make_parser = subparser_meas.add_parser("make", help="Make a measurement")
     make_parser.add_argument("video_path", help="Path to video file", type=str)
+    make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.01)
+    make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
+    make_parser.add_argument("--debug_save_chunks_path", help="Save SDK chunks to folder", type=str, default=None)
     list_parser = subparser_meas.add_parser("list", help="List existing measurements")
     list_parser.add_argument("--limit", help="Number of measurements to retrieve (default : 10)", type=int, default=10)
     get_parser = subparser_meas.add_parser("get", help="Retrieve a measurement")
