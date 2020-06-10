@@ -138,7 +138,7 @@ def draw_on_image(dfxframe,
                 lineType=cv2.LINE_AA)
 
     # Render the message
-    if message is not None:
+    if message:
         current_row += 30
         cv2.putText(render_image,
                     message,
@@ -150,16 +150,17 @@ def draw_on_image(dfxframe,
                     lineType=cv2.LINE_AA)
 
     # Render the results
-    for k, v in results.items():
-        current_row += 12
-        cv2.putText(render_image,
-                    f"{k}: {v}",
-                    org=(20, current_row),
-                    fontFace=cv2.FONT_HERSHEY_PLAIN,
-                    fontScale=0.8,
-                    color=(0, 0, 0),
-                    thickness=1,
-                    lineType=cv2.LINE_AA)
+    if results:
+        for k, v in results.items():
+            current_row += 12
+            cv2.putText(render_image,
+                        f"{k}: {v}",
+                        org=(20, current_row),
+                        fontFace=cv2.FONT_HERSHEY_PLAIN,
+                        fontScale=0.8,
+                        color=(0, 0, 0),
+                        thickness=1,
+                        lineType=cv2.LINE_AA)
 
     # Render the current time (so user knows things arent frozen)
     now = datetime.datetime.now()

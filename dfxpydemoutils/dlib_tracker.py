@@ -9,6 +9,8 @@ import numpy as np
 
 class DlibTracker():
     def __init__(self, face_detect_strategy=None):
+        self._detect_proc = None
+
         this_directory = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(this_directory, "res", "shape_predictor_68_face_landmarks.dat")
 
@@ -31,11 +33,7 @@ class DlibTracker():
         return dlib.__version__
 
     def __del__(self):
-        if self._fd_fast:
-            self._results_queue.cancel_join_thread()
-            self._work_queue.cancel_join_thread()
-            self._detect_proc.terminate()
-            self._detect_proc.join()
+        self.stop()
 
     def _detectFacesThreaded(self):
         while True:
@@ -91,6 +89,12 @@ class DlibTracker():
             }
 
         return faces
+
+    def stop(self):
+        if self._detect_proc and self._detect_proc.is_alive():
+            self._detect_proc.terminate()
+            self._work_queue.cancel_join_thread()
+            self._results_queue.cancel_join_thread()
 
     def _smoothPoints(self, newx, newy, pointname, framesToSmooth=10):
         xs, ys = self._smoothed[pointname]
