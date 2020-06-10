@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import base64
 import json
 import math
 import os.path
@@ -8,9 +9,10 @@ import string
 
 import aiohttp
 import cv2
-import dfx_apiv2_client as dfxapi
-import libdfx as dfxsdk
 import numpy as np
+
+import libdfx as dfxsdk
+import dfx_apiv2_client as dfxapi
 
 from dfxpydemoutils import (DlibTracker, dfx_face_from_json, draw_on_image, find_video_rotation, print_meas,
                             print_pretty, read_next_frame, save_chunk)
@@ -126,12 +128,24 @@ async def main(args):
               "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2 into 'res' folder")
         return
 
-    # Get study config file from API (or FAIL)
-    study_cfg_path = ""  # TODO: Get from cloud
-
-    # Create DFX SDK factory and collector (or FAIL)
+    # Create DFX SDK factory
     factory = dfxsdk.Factory()
-    if not factory.initializeStudyFromFile(study_cfg_path):
+    print("Created DFX Factory:", factory.getVersion())
+    sdk_id = factory.getSdkId()
+
+    # Get study config data from API required to initialize DFX SDK collector (or FAIL)
+    async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
+        response = await dfxapi.Studies.retrieve_study_config_hash(session, config["selected_study"], sdk_id)
+        if response["MD5Hash"] != config["study_cfg_hash"]:
+            response = await dfxapi.Studies.retrieve_study_config(session, config["selected_study"], sdk_id)
+            config["study_cfg_hash"] = response["MD5Hash"]
+            config["study_cfg_data"] = response["ConfigFile"]
+            print(f"Retrieved new study config data with md5: {config['study_cfg_hash']}")
+            save_config(config, args.config_file)
+    study_cfg_bytes = base64.standard_b64decode(config["study_cfg_data"])
+
+    # Create DFX SDK collector (or FAIL)
+    if not factory.initializeStudy(study_cfg_bytes):
         print(f"DFX factory creation failed: {factory.getLastErrorMessage()}")
         return
     factory.setMode("discrete")
@@ -148,7 +162,6 @@ async def main(args):
     collector.setTargetFPS(fps)
     collector.setChunkDurationSeconds(chunk_duration_s)
     collector.setNumberChunks(number_chunks)
-    print(f"Created DFX collector from study {study_cfg_path}")
     print(f"    mode: {factory.getMode()}")
     print(f"    number chunks: {collector.getNumberChunks()}")
     print(f"    chunk duration: {collector.getChunkDurationSeconds()}s")
@@ -292,7 +305,9 @@ def load_config(config_file):
         "user_id": "",
         "user_token": "",
         "selected_study": "",
-        "last_measurement": ""
+        "last_measurement": "",
+        "study_cfg_hash": "",
+        "study_cfg_data": "",
     }
     if os.path.isfile(config_file):
         with open(config_file, "r") as c:
