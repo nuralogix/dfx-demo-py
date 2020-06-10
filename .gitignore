@@ -142,3 +142,4 @@ config.json
 .config.json
 creds.json
 .creds.json
+**/res/*.dat
