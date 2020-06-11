@@ -136,9 +136,9 @@ async def main(args):
     # Get study config data from API required to initialize DFX SDK collector (or FAIL)
     # TODO: Handle 404 properly here...
     async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
-        response = await dfxapi.Studies.retrieve_study_config_hash(session, config["selected_study"], sdk_id)
+        response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
         if response["MD5Hash"] != config["study_cfg_hash"]:
-            response = await dfxapi.Studies.retrieve_study_config(session, config["selected_study"], sdk_id)
+            response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"], sdk_id)
             config["study_cfg_hash"] = response["MD5Hash"]
             config["study_cfg_data"] = response["ConfigFile"]
             print(f"Retrieved new study config data with md5: {config['study_cfg_hash']}")
@@ -271,11 +271,10 @@ async def main(args):
                 num_results_received = 0
                 async for msg in ws:
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
-                    if request_id == results_request_id:
-                        if len(payload) > 0:
-                            result = collector.decodeMeasurementResult(payload)
-                            print_result(result)
-                            num_results_received += 1
+                    if request_id == results_request_id and len(payload) > 0:
+                        result = collector.decodeMeasurementResult(payload)
+                        print_result(result)
+                        num_results_received += 1
                     if num_results_received == results_expected:
                         await ws.close()
                         break
