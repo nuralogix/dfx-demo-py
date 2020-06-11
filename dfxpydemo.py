@@ -184,66 +184,23 @@ async def main(args):
             results_request_id = generate_reqid()
             await dfxapi.Measurements.ws_subscribe_to_results(ws, results_request_id, measurement_id)
 
-            # Use this to close WebSocket in the receive loop
+            # Queue to pass chunks between coroutines
             chunk_queue = asyncio.Queue(number_chunks)
+
+            # When we receive `results_expected` results, we close the WebSocket in the receive loop
             results_expected = number_chunks
 
-            # Produce chunks
-            async def extract_video():
-                frame_number = 0
-                while True:
-                    read, image = await read_next_frame(videocap, fps, rotation, False)
-                    if not read or image is None or frame_number >= frames_to_process:
-                        # Video ended, so grab what should be the last, possibly truncated chunk
-                        collector.forceComplete()
-                        chunk_data = collector.getChunkData()
-                        if chunk_data is not None:
-                            chunk = chunk_data.getChunkPayload()
-                            await chunk_queue.put(chunk)
-                            break
+            # Coroutine to produce chunks and put then in chunk_queue
+            produce_chunks_coro = extract_video(
+                chunk_queue,  # Chunks will be put into this queue
+                (videocap, fps, rotation, frames_to_process, frame_duration_ns),  # Video capture stuffs
+                tracker,  # Face tracker
+                collector,  # DFX SDK collector needed to create chunks
+                (not args.no_render, os.path.basename(args.video_path))  # Rendering options
+            )
 
-                    # Track faces
-                    tracked_faces = tracker.trackFaces(image)
-
-                    # Create a DFX VideoFrame, then a DFX Frame from the DFX VideoFrame and add DFX faces to it
-                    dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_number * frame_duration_ns,
-                                                        dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR)
-                    dfx_frame = collector.createFrame(dfx_video_frame)
-                    if len(tracked_faces) > 0:
-                        tracked_face = next(iter(tracked_faces.values()))  # We only care about the first face
-                        dfx_face = dfx_face_from_json(collector, tracked_face)
-                        dfx_frame.addFace(dfx_face)
-
-                    # Do the extraction
-                    collector.defineRegions(dfx_frame)
-                    result = collector.extractChannels(dfx_frame)
-
-                    # Grab a chunk and check if we are finished
-                    if result == dfxsdk.CollectorState.CHUNKREADY or result == dfxsdk.CollectorState.COMPLETED:
-                        chunk_data = collector.getChunkData()
-                        if chunk_data is not None:
-                            chunk = chunk_data.getChunkPayload()
-                            await chunk_queue.put(chunk)
-                        if result == dfxsdk.CollectorState.COMPLETED:
-                            break
-
-                    # We should really be getting this from OpenCV but it's unreliable...
-                    frame_number += 1
-
-                    # Rendering
-                    if not args.no_render:
-                        render_image = np.copy(image)
-                        draw_on_image(dfx_frame, render_image, os.path.basename(args.video_path), frame_number,
-                                      frames_to_process, fps, True, None, None)
-
-                        cv2.imshow("d", render_image)
-                        cv2.waitKey(1)
-
-                # Signal to send_chunks that we are done
-                await chunk_queue.put(None)
-
+            # Coroutine to get chunks from chunk_queue and send chunk using WebSocket
             async def send_chunks():
-                # Coroutine to iterate through the payload files and send chunks using WebSocket
                 while True:
                     chunk = await chunk_queue.get()
                     if chunk is None:
@@ -266,8 +223,8 @@ async def main(args):
 
                     chunk_queue.task_done()
 
+            # Coroutine to receive responses using Websocket
             async def receive_results():
-                # Coroutine to receive results
                 num_results_received = 0
                 async for msg in ws:
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
@@ -281,13 +238,13 @@ async def main(args):
 
             # Start the three coroutines and await till they finish
             try:
-                await asyncio.gather(extract_video(), send_chunks(), receive_results())
+                await asyncio.gather(produce_chunks_coro, send_chunks(), receive_results())
             except Exception as e:
                 print(e)
                 print(f"Measurement {measurement_id} failed")
                 return
             finally:
-                tracker.stop()
+                tracker.stop()  # TODO This should not be needed
                 print("Stopping face tracker...")
 
         print(f"Measurement {measurement_id} complete")
@@ -415,6 +372,63 @@ def logout(config, config_file):
     config["user_id"] = ""
     print("Logout successful")
     return True
+
+
+async def extract_video(chunk_queue, video_opts, tracker, collector, render_opts):
+    videocap, fps, rotation, frames_to_process, frame_duration_ns = video_opts
+    render, video_file_name = render_opts
+    frame_number = 0
+
+    while True:
+        read, image = await read_next_frame(videocap, fps, rotation, False)
+        if not read or image is None or frame_number >= frames_to_process:
+            # Video ended, so grab what should be the last, possibly truncated chunk
+            collector.forceComplete()
+            chunk_data = collector.getChunkData()
+            if chunk_data is not None:
+                chunk = chunk_data.getChunkPayload()
+                await chunk_queue.put(chunk)
+                break
+
+        # Track faces
+        tracked_faces = tracker.trackFaces(image)
+
+        # Create a DFX VideoFrame, then a DFX Frame from the DFX VideoFrame and add DFX faces to it
+        dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_number * frame_duration_ns,
+                                            dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR)
+        dfx_frame = collector.createFrame(dfx_video_frame)
+        if len(tracked_faces) > 0:
+            tracked_face = next(iter(tracked_faces.values()))  # We only care about the first face
+            dfx_face = dfx_face_from_json(collector, tracked_face)
+            dfx_frame.addFace(dfx_face)
+
+        # Do the extraction
+        collector.defineRegions(dfx_frame)
+        result = collector.extractChannels(dfx_frame)
+
+        # Grab a chunk and check if we are finished
+        if result == dfxsdk.CollectorState.CHUNKREADY or result == dfxsdk.CollectorState.COMPLETED:
+            chunk_data = collector.getChunkData()
+            if chunk_data is not None:
+                chunk = chunk_data.getChunkPayload()
+                await chunk_queue.put(chunk)
+            if result == dfxsdk.CollectorState.COMPLETED:
+                break
+
+        # We should really be getting this from OpenCV but it's unreliable...
+        frame_number += 1
+
+        # Rendering
+        if render:
+            render_image = np.copy(image)
+            draw_on_image(dfx_frame, render_image, video_file_name, frame_number, frames_to_process, fps, True, None,
+                          None)
+
+            cv2.imshow("d", render_image)
+            cv2.waitKey(1)
+
+    # Signal to send_chunks that we are done
+    await chunk_queue.put(None)
 
 
 async def measure_websocket(session, measurement_id, measurement_files, number_chunks):
