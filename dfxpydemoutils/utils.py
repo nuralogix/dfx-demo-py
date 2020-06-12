@@ -185,6 +185,27 @@ def print_pretty(x, csv=False, indent=0) -> None:
         print(x)
 
 
+def print_sdk_result(result):
+    if not result.isValid():
+        print("Received invalid result from DFX SDK collector decode!!")
+        return
+
+    print(f"Received chunk {result.getMeasurementProperty('MeasurementDataID').split(':')[-1]}")
+
+    dict_result = {}
+
+    status = result.getErrorCode()
+    if status != "OK":
+        dict_result["Status"] = status
+
+    for k in result.getMeasurementDataKeys():
+        data_result = result.getMeasurementData(k)
+        value = data_result.getData()
+        dict_result[k] = str(sum(value) / len(value)) if len(value) > 0 else None
+
+    print_pretty(dict_result, indent=2)
+
+
 def print_meas(measurement_results, csv=False):
     if measurement_results["Results"]:
         grid_results = []
@@ -194,10 +215,12 @@ def print_meas(measurement_results, csv=False):
             description = measurement_results["SignalDescriptions"][signal_id]
             if not csv and len(description) > 100:
                 description = description[:100] + "..."
+            result_value = sum(result_data["Data"]) / len(result_data["Data"]) / result_data["Multiplier"] if len(
+                result_data["Data"]) > 0 and result_data["Multiplier"] > 0 else None
             grid_result = {
                 "ID": signal_id,
                 "Name": signal_name,
-                "Value": sum(result_data["Data"]) / len(result_data["Data"]) / result_data["Multiplier"],
+                "Value": result_value,
                 "Unit": units if units is not None else "",
                 "Category": measurement_results["SignalConfig"][signal_id]["category"],
                 "Description": description

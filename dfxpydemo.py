@@ -16,8 +16,8 @@ import numpy as np
 import libdfx as dfxsdk
 import dfx_apiv2_client as dfxapi
 
-from dfxpydemoutils import (DlibTracker, dfx_face_from_json, draw_on_image, find_video_rotation, print_meas,
-                            print_pretty, read_next_frame, save_chunk)
+from dfxpydemoutils import (DlibTracker, dfx_face_from_json, draw_on_image, find_video_rotation, print_sdk_result,
+                            print_meas, print_pretty, read_next_frame, save_chunk)
 
 try:
     _version = f"v{pkg_resources.require('dfxpydemo')[0].version}"
@@ -274,7 +274,7 @@ async def main(args):
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
                     if request_id == results_request_id and len(payload) > 0:
                         result = collector.decodeMeasurementResult(payload)
-                        print_result(result)
+                        print_sdk_result(result)
                         num_results_received += 1
                     if num_results_received == results_expected:
                         await ws.close()
@@ -324,27 +324,6 @@ def save_config(config, config_file):
     with open(config_file, "w") as c:
         c.write(json.dumps(config, indent=4))
         print(f"Config updated in {config_file}")
-
-
-def print_result(result: dfxsdk.MeasurementResult):
-    if not result.isValid():
-        print("Received invalid result from DFX SDK collector decode!!")
-        return
-
-    print(f"Received chunk {result.getMeasurementProperty('MeasurementDataID').split(':')[-1]}")
-
-    dict_result = {}
-
-    status = result.getErrorCode()
-    if status != "OK":
-        dict_result["Status"] = status
-
-    for k in result.getMeasurementDataKeys():
-        data_result = result.getMeasurementData(k)
-        value = data_result.getData()
-        dict_result[k] = str(sum(value) / len(value))
-
-    print_pretty(dict_result, indent=2)
 
 
 def generate_reqid():
