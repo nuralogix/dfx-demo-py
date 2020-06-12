@@ -1,9 +1,11 @@
 import argparse
 import asyncio
 import base64
+import glob
 import json
 import math
 import os.path
+import pkg_resources
 import random
 import string
 
@@ -16,6 +18,11 @@ import dfx_apiv2_client as dfxapi
 
 from dfxpydemoutils import (DlibTracker, dfx_face_from_json, draw_on_image, find_video_rotation, print_meas,
                             print_pretty, read_next_frame, save_chunk)
+
+try:
+    _version = f"v{pkg_resources.require('dfxpydemo')[0].version}"
+except Exception:
+    _version = ""
 
 
 async def main(args):
@@ -80,7 +87,7 @@ async def main(args):
         return
 
     # Retrieve or list measurements
-    if args.command == "meas" and args.subcommand != "make":
+    if args.command == "meas" and "make" not in args.subcommand:
         async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
             if args.subcommand == "get":
                 measurement_id = config["last_measurement"] if args.measurement_id is None else args.measurement_id
@@ -95,88 +102,114 @@ async def main(args):
         return
 
     # Make a measurement
-    assert args.command == "meas" and args.subcommand == "make"
+    assert args.command == "meas" and "make" in args.subcommand
 
     # Verify preconditions
     if not config["selected_study"]:
         print("Please select a study first using 'study select'")
         return
 
-    # Open video or camera (or FAIL)
-    videocap = cv2.VideoCapture(args.video_path)
-    if not videocap.isOpened():
-        print(f"Could not open {args.video_path}")
-        return
-    fps = videocap.get(cv2.CAP_PROP_FPS)
-    if fps <= 0:
-        print(f"Video framerate {fps} is invalid. Please override using '--fps' parameter.")
-        return
-    frames_to_process = int(videocap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if frames_to_process / fps > 120:
-        print(f"Video duration {frames_to_process / fps:.1f}s is longer than 120s, processing first 120s only.")
-        frames_to_process = int(fps * 120)
-    rotation = await find_video_rotation(args.video_path)
-    frame_duration_ns = 1000000000.0 / fps
+    if args.subcommand == "debug_make_from_chunks":
+        payload_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "payload*.bin")))
+        meta_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "metadata*.bin")))
+        prop_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "properties*.json")))
+        number_files = min(len(payload_files), len(meta_files), len(prop_files))
+        if number_files <= 0:
+            print(f"No payload files found in {args.debug_chunks_folder}")
+            return
+        with open(prop_files[0], 'r') as pr:
+            props = json.load(pr)
+            number_chunks = props["number_chunks"]
+            duration_pr = props["duration_s"]
+        if number_chunks != number_files:
+            print(f"Number of chunks in properties.json {number_chunks} != Number of payload files {number_files}")
+            return
+        if duration_pr * number_chunks > 120:
+            print(f"Total payload duration {duration_pr * number_chunks} seconds is more than 120 seconds")
+            return
 
-    # Create a DlibTracker (or FAIL)
-    tracker = None
-    try:
-        tracker = DlibTracker()
-    except RuntimeError as e:
-        print(e)
-        print("Please download and unzip "
-              "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2 into 'res' folder")
-        return
+        # Create DFX SDK factory (just so we can have a collector for decoding results)
+        factory = dfxsdk.Factory()
+        print("Created DFX Factory:", factory.getVersion())
+        collector = factory.createCollector()
+        print("Created DFX Collector for results decoding only")
+    else:  # args.subcommand == "make":
+        # Open video or camera (or FAIL)
+        videocap = cv2.VideoCapture(args.video_path)
+        if not videocap.isOpened():
+            print(f"Could not open {args.video_path}")
+            return
+        fps = videocap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            print(f"Video framerate {fps} is invalid. Please override using '--fps' parameter.")
+            return
+        frames_to_process = int(videocap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if frames_to_process / fps > 120:
+            print(f"Video duration {frames_to_process / fps:.1f}s is longer than 120s, processing first 120s only.")
+            frames_to_process = int(fps * 120)
+        rotation = await find_video_rotation(args.video_path)
+        frame_duration_ns = 1000000000.0 / fps
 
-    # Create DFX SDK factory
-    factory = dfxsdk.Factory()
-    print("Created DFX Factory:", factory.getVersion())
-    sdk_id = factory.getSdkId()
+        # Create a DlibTracker (or FAIL)
+        tracker = None
+        try:
+            tracker = DlibTracker()
+        except RuntimeError as e:
+            print(e)
+            print("Please download and unzip "
+                  "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2 into 'res' folder")
+            return
 
-    # Get study config data from API required to initialize DFX SDK collector (or FAIL)
-    # TODO: Handle 404 properly here...
-    async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
-        response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
-        if response["MD5Hash"] != config["study_cfg_hash"]:
-            response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"], sdk_id)
-            config["study_cfg_hash"] = response["MD5Hash"]
-            config["study_cfg_data"] = response["ConfigFile"]
-            print(f"Retrieved new study config data with md5: {config['study_cfg_hash']}")
-            save_config(config, args.config_file)
-    study_cfg_bytes = base64.standard_b64decode(config["study_cfg_data"])
+        # Create DFX SDK factory
+        factory = dfxsdk.Factory()
+        print("Created DFX Factory:", factory.getVersion())
+        sdk_id = factory.getSdkId()
 
-    # Create DFX SDK collector (or FAIL)
-    if not factory.initializeStudy(study_cfg_bytes):
-        print(f"DFX factory creation failed: {factory.getLastErrorMessage()}")
-        return
-    factory.setMode("discrete")
-    collector = factory.createCollector()
-    if collector.getCollectorState() == dfxsdk.CollectorState.ERROR:
-        print(f"DFX collector creation failed: {collector.getLastErrorMessage()}")
-        return
+        if args.debug_study_cfg_file is None:
+            # Get study config data from API required to initialize DFX SDK collector (or FAIL)
+            # TODO: Handle 404 properly here...
+            async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
+                response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
+                if response["MD5Hash"] != config["study_cfg_hash"]:
+                    response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"], sdk_id)
+                    config["study_cfg_hash"] = response["MD5Hash"]
+                    config["study_cfg_data"] = response["ConfigFile"]
+                    print(f"Retrieved new study config data with md5: {config['study_cfg_hash']}")
+                    save_config(config, args.config_file)
+            study_cfg_bytes = base64.standard_b64decode(config["study_cfg_data"])
+        else:
+            with open(args.debug_study_cfg_file, 'rb') as f:
+                study_cfg_bytes = f.read()
 
-    print("Created DFX Collector:")
-    chunk_duration_s = float(args.chunk_duration_s)
-    frames_per_chunk = math.ceil(chunk_duration_s * fps)
-    number_chunks = math.ceil(frames_to_process / frames_per_chunk)
+        # Create DFX SDK collector (or FAIL)
+        if not factory.initializeStudy(study_cfg_bytes):
+            print(f"DFX factory creation failed: {factory.getLastErrorMessage()}")
+            return
+        factory.setMode("discrete")
+        collector = factory.createCollector()
+        if collector.getCollectorState() == dfxsdk.CollectorState.ERROR:
+            print(f"DFX collector creation failed: {collector.getLastErrorMessage()}")
+            return
 
-    # Set collector config
-    collector.setTargetFPS(fps)
-    collector.setChunkDurationSeconds(chunk_duration_s)
-    collector.setNumberChunks(number_chunks)
-    print(f"    mode: {factory.getMode()}")
-    print(f"    number chunks: {collector.getNumberChunks()}")
-    print(f"    chunk duration: {collector.getChunkDurationSeconds()}s")
-    for constraint in collector.getEnabledConstraints():
-        print(f"    enabled constraint: {constraint}")
+        print("Created DFX Collector:")
+        chunk_duration_s = float(args.chunk_duration_s)
+        frames_per_chunk = math.ceil(chunk_duration_s * fps)
+        number_chunks = math.ceil(frames_to_process / frames_per_chunk)
+
+        # Set collector config
+        collector.setTargetFPS(fps)
+        collector.setChunkDurationSeconds(chunk_duration_s)
+        collector.setNumberChunks(number_chunks)
+        print(f"    mode: {factory.getMode()}")
+        print(f"    number chunks: {collector.getNumberChunks()}")
+        print(f"    chunk duration: {collector.getChunkDurationSeconds()}s")
+        for constraint in collector.getEnabledConstraints():
+            print(f"    enabled constraint: {constraint}")
 
     async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
         # Create a measurement
         measurement_id = await dfxapi.Measurements.create(session, config["selected_study"])
         print(f"Created measurement {measurement_id}")
-
-        # Start the DFX SDK collection
-        collector.startCollection()
 
         # Use the session to connect to the WebSocket
         async with session.ws_connect(dfxapi.Settings.ws_url) as ws:
@@ -191,13 +224,16 @@ async def main(args):
             results_expected = number_chunks
 
             # Coroutine to produce chunks and put then in chunk_queue
-            produce_chunks_coro = extract_video(
-                chunk_queue,  # Chunks will be put into this queue
-                (videocap, fps, rotation, frames_to_process, frame_duration_ns),  # Video capture stuffs
-                tracker,  # Face tracker
-                collector,  # DFX SDK collector needed to create chunks
-                (not args.no_render, os.path.basename(args.video_path))  # Rendering options
-            )
+            if args.subcommand == "debug_make_from_chunks":
+                produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
+            else:  # args.subcommand == "make"
+                produce_chunks_coro = extract_video(
+                    chunk_queue,  # Chunks will be put into this queue
+                    (videocap, fps, rotation, frames_to_process, frame_duration_ns),  # Video capture
+                    tracker,  # Face tracker
+                    collector,  # DFX SDK collector needed to create chunks
+                    (not args.no_render, os.path.basename(args.video_path))  # Rendering
+                )
 
             # Coroutine to get chunks from chunk_queue and send chunk using WebSocket
             async def send_chunks():
@@ -217,9 +253,9 @@ async def main(args):
                     print(f"Sent chunk {chunk.chunk_number}")
 
                     # Save chunk (for debugging purposes)
-                    if args.debug_save_chunks_path:
-                        save_chunk(chunk, args.debug_save_chunks_path)
-                        print(f"Saved chunk {chunk.chunk_number} in '{args.debug_save_chunks_path}'")
+                    if "debug_save_chunks_folder" in args and args.debug_save_chunks_folder:
+                        save_chunk(chunk, args.debug_save_chunks_folder)
+                        print(f"Saved chunk {chunk.chunk_number} in '{args.debug_save_chunks_folder}'")
 
                     chunk_queue.task_done()
 
@@ -243,9 +279,6 @@ async def main(args):
                 print(e)
                 print(f"Measurement {measurement_id} failed")
                 return
-            finally:
-                tracker.stop()  # TODO This should not be needed
-                print("Stopping face tracker...")
 
         print(f"Measurement {measurement_id} complete")
         config["last_measurement"] = measurement_id
@@ -377,8 +410,12 @@ def logout(config, config_file):
 async def extract_video(chunk_queue, video_opts, tracker, collector, render_opts):
     videocap, fps, rotation, frames_to_process, frame_duration_ns = video_opts
     render, video_file_name = render_opts
-    frame_number = 0
 
+    # Start the DFX SDK collection
+    collector.startCollection()
+
+    # Read frames from the video, track faces and extract using collector
+    frame_number = 0
     while True:
         read, image = await read_next_frame(videocap, fps, rotation, False)
         if not read or image is None or frame_number >= frames_to_process:
@@ -424,61 +461,42 @@ async def extract_video(chunk_queue, video_opts, tracker, collector, render_opts
             draw_on_image(dfx_frame, render_image, video_file_name, frame_number, frames_to_process, fps, True, None,
                           None)
 
-            cv2.imshow("d", render_image)
-            cv2.waitKey(1)
+            cv2.imshow(f"dfxdemo {_version}", render_image)
+            cv2.waitKey(1)  # TODO: Handle cancellation
 
     # Signal to send_chunks that we are done
     await chunk_queue.put(None)
 
 
-async def measure_websocket(session, measurement_id, measurement_files, number_chunks):
-    # Use the session to connect to the WebSocket
-    async with session.ws_connect(dfxapi.Settings.ws_url) as ws:
-        # Subscribe to results
-        results_request_id = generate_reqid()
-        await dfxapi.Measurements.ws_subscribe_to_results(ws, results_request_id, measurement_id)
+async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files):
+    for payload_file, meta_file, prop_file in zip(payload_files, meta_files, prop_files):
+        with open(payload_file, 'rb') as p, open(meta_file, 'rb') as m, open(prop_file, 'r') as pr:
+            payload_bytes = p.read()
+            meta_bytes = m.read()
+            props = json.load(pr)
 
-        # Use this to close WebSocket in the receive loop
-        results_expected = number_chunks + 1
+            chunk = dfxsdk.Payload()
+            chunk.valid = props["valid"]
+            chunk.start_frame = props["start_frame"]
+            chunk.end_frame = props["end_frame"]
+            chunk.chunk_number = props["chunk_number"]
+            chunk.number_chunks = props["number_chunks"]
+            chunk.first_chunk_start_time_s = props["first_chunk_start_time_s"]
+            chunk.start_time_s = props["start_time_s"]
+            chunk.end_time_s = props["end_time_s"]
+            chunk.duration_s = props["duration_s"]
+            chunk.number_payload_bytes = len(payload_bytes)
+            chunk.payload_data = payload_bytes
+            chunk.number_metadata_bytes = len(meta_bytes)
+            chunk.metadata = meta_bytes
 
-        async def send_chunks():
-            # Coroutine to iterate through the payload files and send chunks using WebSocket
-            for payload_file, meta_file, prop_file in measurement_files:
-                with open(payload_file, 'rb') as p, open(meta_file, 'rb') as m, open(prop_file, 'r') as pr:
-                    payload_bytes = p.read()
-                    meta_bytes = m.read()
-                    props = json.load(pr)
+            await chunk_queue.put(chunk)
 
-                    # Determine action and request id
-                    action = determine_action(props["chunk_number"], props["number_chunks"])
-                    request_id = generate_reqid()
+            # Sleep to simulate a live measurement and not hit the rate limit
+            sleep_time = props["duration_s"]
+            await asyncio.sleep(sleep_time)
 
-                    # Add data
-                    await dfxapi.Measurements.ws_add_data(ws, generate_reqid(), measurement_id, props["chunk_number"],
-                                                          action, props["start_time_s"], props["end_time_s"],
-                                                          props["duration_s"], meta_bytes, payload_bytes)
-                    sleep_time = props["duration_s"]
-                    print(
-                        f"Sent chunk req#:{request_id} - {action} ...waiting {sleep_time:.0f} seconds instead of {props['duration_s']:.0f}..."
-                    )
-
-                    # Sleep to simulate a live measurement and not hit the rate limit
-                    await asyncio.sleep(sleep_time)
-
-        async def receive_results():
-            # Coroutine to receive results
-            num_results_received = 0
-            async for msg in ws:
-                status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
-                if request_id == results_request_id:
-                    print(f"  Received result - {len(payload)} bytes {payload[:80]}")
-                    num_results_received += 1
-                if num_results_received == results_expected:
-                    await ws.close()
-                    break
-
-        # Start the two coroutines and await till they finish
-        await asyncio.gather(send_chunks(), receive_results())
+    await chunk_queue.put(None)
 
 
 def cmdline():
@@ -514,11 +532,6 @@ def cmdline():
 
     subparser_meas = subparser_top.add_parser("meas", help="Measurements").add_subparsers(dest="subcommand",
                                                                                           required=True)
-    make_parser = subparser_meas.add_parser("make", help="Make a measurement")
-    make_parser.add_argument("video_path", help="Path to video file", type=str)
-    make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.01)
-    make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
-    make_parser.add_argument("--debug_save_chunks_path", help="Save SDK chunks to folder", type=str, default=None)
     list_parser = subparser_meas.add_parser("list", help="List existing measurements")
     list_parser.add_argument("--limit", help="Number of measurements to retrieve (default : 10)", type=int, default=10)
     get_parser = subparser_meas.add_parser("get", help="Retrieve a measurement")
@@ -526,7 +539,21 @@ def cmdline():
                             nargs="?",
                             help="ID of measurement to retrieve (default: last measurement)",
                             default=None)
-
+    make_parser = subparser_meas.add_parser("make", help="Make a measurement from a video file")
+    make_parser.add_argument("video_path", help="Path to video file", type=str)
+    make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.01)
+    make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
+    make_parser.add_argument("--debug_study_cfg_file",
+                             help="Study config file to use instead of data from API (debugging)",
+                             type=str,
+                             default=None)
+    make_parser.add_argument("--debug_save_chunks_folder",
+                             help="Save SDK chunks to folder (debugging)",
+                             type=str,
+                             default=None)
+    mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
+                                             help="Make a measurement from saved SDK chunks (debugging)")
+    mk_ch_parser.add_argument("debug_chunks_folder", help="Folder containing SDK chunks", type=str)
     args = parser.parse_args()
 
     # asyncio.run(main(args))  # https://github.com/aio-libs/aiohttp/issues/4324
