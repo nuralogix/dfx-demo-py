@@ -25,7 +25,7 @@ class DlibTracker():
             self._last_detected_faces = []
             self._work_queue = mp.Queue(1)
             self._results_queue = mp.Queue(1)
-            self._detect_proc = mp.Process(target=self._detectFacesThreaded)
+            self._detect_proc = mp.Process(target=self._detectFacesThreaded, name="dlib_tracker")
             self._detect_proc.start()
 
     @staticmethod

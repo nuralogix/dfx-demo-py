@@ -37,7 +37,9 @@ async def main(args):
 
             return
 
-    # Register or unregister
+    # Handle various command line subcommands
+
+    # Handle "orgs" (Organizations) commands - "register" and "unregister"
     if args.command == "orgs":
         if args.subcommand == "unregister":
             success = await unregister(config, args.config_file)
@@ -48,7 +50,7 @@ async def main(args):
             save_config(config, args.config_file)
         return
 
-    # Login or logout
+    # Handle "users" commands - "login" and "logout"
     if args.command == "users":
         if args.subcommand == "logout":
             success = logout(config, args.config_file)
@@ -68,7 +70,7 @@ async def main(args):
     token = dfxapi.Settings.user_token if dfxapi.Settings.user_token else dfxapi.Settings.device_token
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Retrieve or list studies
+    # Handle "studies" commands - "get", "list" and "select"
     if args.command == "studies":
         async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
             if args.subcommand == "get":
@@ -86,7 +88,7 @@ async def main(args):
                 save_config(config, args.config_file)
         return
 
-    # Retrieve or list measurements
+    # Handle "meas" (Measurements) commands - "get" and "list"
     if args.command == "meas" and "make" not in args.subcommand:
         async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
             if args.subcommand == "get":
@@ -101,7 +103,7 @@ async def main(args):
                 print(json.dumps(measurements)) if args.json else print_pretty(measurements, args.csv)
         return
 
-    # Make a measurement
+    # Handle "meas" (Measurements) commands - "make" and "debug_make_from_chunks"
     assert args.command == "meas" and "make" in args.subcommand
 
     # Verify preconditions
@@ -109,31 +111,8 @@ async def main(args):
         print("Please select a study first using 'study select'")
         return
 
-    if args.subcommand == "debug_make_from_chunks":
-        payload_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "payload*.bin")))
-        meta_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "metadata*.bin")))
-        prop_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "properties*.json")))
-        number_files = min(len(payload_files), len(meta_files), len(prop_files))
-        if number_files <= 0:
-            print(f"No payload files found in {args.debug_chunks_folder}")
-            return
-        with open(prop_files[0], 'r') as pr:
-            props = json.load(pr)
-            number_chunks = props["number_chunks"]
-            duration_pr = props["duration_s"]
-        if number_chunks != number_files:
-            print(f"Number of chunks in properties.json {number_chunks} != Number of payload files {number_files}")
-            return
-        if duration_pr * number_chunks > 120:
-            print(f"Total payload duration {duration_pr * number_chunks} seconds is more than 120 seconds")
-            return
-
-        # Create DFX SDK factory (just so we can have a collector for decoding results)
-        factory = dfxsdk.Factory()
-        print("Created DFX Factory:", factory.getVersion())
-        collector = factory.createCollector()
-        print("Created DFX Collector for results decoding only")
-    else:  # args.subcommand == "make":
+    # Prepare for making a measurement
+    if args.subcommand == "make":
         # Open video or camera (or FAIL)
         videocap = cv2.VideoCapture(args.video_path)
         if not videocap.isOpened():
@@ -206,8 +185,37 @@ async def main(args):
         for constraint in collector.getEnabledConstraints():
             print(f"    enabled constraint: {constraint}")
 
+    elif args.subcommand == "debug_make_from_chunks":
+        payload_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "payload*.bin")))
+        meta_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "metadata*.bin")))
+        prop_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "properties*.json")))
+        number_files = min(len(payload_files), len(meta_files), len(prop_files))
+        if number_files <= 0:
+            print(f"No payload files found in {args.debug_chunks_folder}")
+            return
+        with open(prop_files[0], 'r') as pr:
+            props = json.load(pr)
+            number_chunks = props["number_chunks"]
+            duration_pr = props["duration_s"]
+        if number_chunks != number_files:
+            print(f"Number of chunks in properties.json {number_chunks} != Number of payload files {number_files}")
+            return
+        if duration_pr * number_chunks > 120:
+            print(f"Total payload duration {duration_pr * number_chunks} seconds is more than 120 seconds")
+            return
+
+        # Create DFX SDK factory (just so we can have a collector for decoding results)
+        factory = dfxsdk.Factory()
+        print("Created DFX Factory:", factory.getVersion())
+        collector = factory.createCollector()
+        print("Created DFX Collector for results decoding only")
+    else:
+        print("Unknown subcommand to 'meas'. This should never happen")
+        return
+
+    # Make a measurement
     async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
-        # Create a measurement
+        # Create a measurement on the API and get the measurement ID
         measurement_id = await dfxapi.Measurements.create(session, config["selected_study"])
         print(f"Created measurement {measurement_id}")
 
@@ -224,9 +232,7 @@ async def main(args):
             results_expected = number_chunks
 
             # Coroutine to produce chunks and put then in chunk_queue
-            if args.subcommand == "debug_make_from_chunks":
-                produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
-            else:  # args.subcommand == "make"
+            if args.subcommand == "make":
                 produce_chunks_coro = extract_video(
                     chunk_queue,  # Chunks will be put into this queue
                     (videocap, fps, rotation, frames_to_process, frame_duration_ns),  # Video capture
@@ -234,6 +240,8 @@ async def main(args):
                     collector,  # DFX SDK collector needed to create chunks
                     (not args.no_render, os.path.basename(args.video_path))  # Rendering
                 )
+            else:  # args.subcommand == "debug_make_from_chunks":
+                produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
 
             # Coroutine to get chunks from chunk_queue and send chunk using WebSocket
             async def send_chunks():
