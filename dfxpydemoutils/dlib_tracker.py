@@ -41,7 +41,10 @@ class DlibTracker():
             if image is None:
                 break
             detected_faces = self._face_detector(image, 0)
-            self._results_queue.put(detected_faces)
+            try:
+                self._results_queue.put_nowait(detected_faces)
+            except queue.Full:
+                pass
 
     def trackFaces(self, image, searchRect=None, desiredAttributes=None):
         x, y, w, h = self._sanitizeRoi(image.shape, searchRect)
@@ -92,6 +95,7 @@ class DlibTracker():
 
     def stop(self):
         if self._detect_proc and self._detect_proc.is_alive():
+            self._work_queue.put(None)
             self._detect_proc.terminate()
             self._work_queue.cancel_join_thread()
             self._results_queue.cancel_join_thread()

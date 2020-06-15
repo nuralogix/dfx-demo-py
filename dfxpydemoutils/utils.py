@@ -39,6 +39,8 @@ async def find_video_rotation(video_path):
 async def read_next_frame(video_cap, target_fps, rotation, mirror):
     if target_fps > 0:
         await asyncio.sleep(1.0 / target_fps)
+    else:
+        await asyncio.sleep(0.033)
 
     read, frame = video_cap.read()
 
@@ -103,79 +105,6 @@ def dfx_face_from_json(collector, json_face):
     return face
 
 
-def draw_on_image(dfxframe,
-                  render_image,
-                  image_src_name,
-                  frame_number,
-                  video_duration_frames,
-                  fps,
-                  measurement_active,
-                  results,
-                  message=None):
-    # Render the face polygons
-    for faceID in dfxframe.getFaceIdentifiers():
-        for regionID in dfxframe.getRegionNames(faceID):
-            if (dfxframe.getRegionIntProperty(faceID, regionID, "draw") != 0):
-                polygon = dfxframe.getRegionPolygon(faceID, regionID)
-                cv2.polylines(render_image, [np.array(polygon)],
-                              isClosed=True,
-                              color=(255, 255, 0),
-                              thickness=1,
-                              lineType=cv2.LINE_AA)
-    # Render the "Extracting " message
-    current_row = 30
-    if measurement_active:
-        msg = f"Extracting from {image_src_name} - {video_duration_frames - frame_number} frames left ({fps:.2f} fps)"
-    else:
-        msg = f"Reading from {image_src_name} - ({fps:.2f} fps)"
-    cv2.putText(render_image,
-                msg,
-                org=(10, current_row),
-                fontFace=cv2.FONT_HERSHEY_PLAIN,
-                fontScale=1,
-                color=(0, 0, 0),
-                thickness=1,
-                lineType=cv2.LINE_AA)
-
-    # Render the message
-    if message:
-        current_row += 30
-        cv2.putText(render_image,
-                    message,
-                    org=(10, current_row),
-                    fontFace=cv2.FONT_HERSHEY_PLAIN,
-                    fontScale=1,
-                    color=(255, 0, 0),
-                    thickness=1,
-                    lineType=cv2.LINE_AA)
-
-    # Render the results
-    if results:
-        for k, v in results.items():
-            current_row += 12
-            cv2.putText(render_image,
-                        f"{k}: {v}",
-                        org=(20, current_row),
-                        fontFace=cv2.FONT_HERSHEY_PLAIN,
-                        fontScale=0.8,
-                        color=(0, 0, 0),
-                        thickness=1,
-                        lineType=cv2.LINE_AA)
-
-    # Render the current time (so user knows things arent frozen)
-    now = datetime.datetime.now()
-    cv2.putText(render_image,
-                f"{now.hour:02d}:{now.minute:02d}:{now.second:02d}",
-                org=(render_image.shape[1] - 90, render_image.shape[0] - 20),
-                fontFace=cv2.FONT_HERSHEY_PLAIN,
-                fontScale=1,
-                color=(0, 255, 0) if now.second % 2 == 0 else (255, 255, 255),
-                thickness=1,
-                lineType=cv2.LINE_AA)
-
-    return current_row
-
-
 def print_pretty(x, csv=False, indent=0) -> None:
     if type(x) == list:
         print_list(x, csv, indent)
@@ -185,23 +114,32 @@ def print_pretty(x, csv=False, indent=0) -> None:
         print(x)
 
 
-def print_sdk_result(result):
-    if not result.isValid():
-        print("Received invalid result from DFX SDK collector decode!!")
-        return
-
-    print(f"Received chunk {result.getMeasurementProperty('MeasurementDataID').split(':')[-1]}")
-
+def sdk_result_to_dict(sdk_result):
     dict_result = {}
 
-    status = result.getErrorCode()
+    if not sdk_result.isValid():
+        return dict_result
+
+    dict_result["chunk_number"] = sdk_result.getMeasurementProperty('MeasurementDataID').split(':')[-1]
+    status = sdk_result.getErrorCode()
     if status != "OK":
         dict_result["Status"] = status
 
-    for k in result.getMeasurementDataKeys():
-        data_result = result.getMeasurementData(k)
+    for k in sdk_result.getMeasurementDataKeys():
+        data_result = sdk_result.getMeasurementData(k)
         value = data_result.getData()
         dict_result[k] = str(sum(value) / len(value)) if len(value) > 0 else None
+
+    return dict_result
+
+
+def print_sdk_result(dict_result):
+    if not dict_result:
+        print("Received invalid sdk_result from DFX SDK collector decode!!")
+        return
+
+    print(f"Received chunk {dict_result['chunk_number']}")
+    del dict_result["chunk_number"]
 
     print_pretty(dict_result, indent=2)
 

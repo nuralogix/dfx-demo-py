@@ -16,8 +16,8 @@ import numpy as np
 import libdfx as dfxsdk
 import dfx_apiv2_client as dfxapi
 
-from dfxpydemoutils import (DlibTracker, dfx_face_from_json, draw_on_image, find_video_rotation, print_sdk_result,
-                            print_meas, print_pretty, read_next_frame, save_chunk)
+from dfxpydemoutils import (DlibTracker, Renderer, NullRenderer, dfx_face_from_json, find_video_rotation,
+                            sdk_result_to_dict, print_sdk_result, print_meas, print_pretty, read_next_frame, save_chunk)
 
 try:
     _version = f"v{pkg_resources.require('dfxpydemo')[0].version}"
@@ -233,15 +233,19 @@ async def main(args):
 
             # Coroutine to produce chunks and put then in chunk_queue
             if args.subcommand == "make":
+                renderer = Renderer(_version, os.path.basename(args.video_path), frames_to_process, fps, measurement_id,
+                                    number_chunks, 0.5) if not args.no_render else NullRenderer()
+                renderer.set_message("Press Esc to cancel")
                 produce_chunks_coro = extract_video(
                     chunk_queue,  # Chunks will be put into this queue
                     (videocap, fps, rotation, frames_to_process, frame_duration_ns),  # Video capture
                     tracker,  # Face tracker
                     collector,  # DFX SDK collector needed to create chunks
-                    (not args.no_render, os.path.basename(args.video_path))  # Rendering
+                    renderer  # Rendering
                 )
             else:  # args.subcommand == "debug_make_from_chunks":
                 produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
+                renderer = NullRenderer()
 
             # Coroutine to get chunks from chunk_queue and send chunk using WebSocket
             async def send_chunks():
@@ -259,6 +263,7 @@ async def main(args):
                                                           action, chunk.start_time_s, chunk.end_time_s,
                                                           chunk.duration_s, chunk.metadata, chunk.payload_data)
                     print(f"Sent chunk {chunk.chunk_number}")
+                    renderer.set_sent(chunk.chunk_number)
 
                     # Save chunk (for debugging purposes)
                     if "debug_save_chunks_folder" in args and args.debug_save_chunks_folder:
@@ -273,16 +278,30 @@ async def main(args):
                 async for msg in ws:
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
                     if request_id == results_request_id and len(payload) > 0:
-                        result = collector.decodeMeasurementResult(payload)
+                        sdk_result = collector.decodeMeasurementResult(payload)
+                        result = sdk_result_to_dict(sdk_result)
+                        renderer.set_results(result.copy())
                         print_sdk_result(result)
                         num_results_received += 1
                     if num_results_received == results_expected:
                         await ws.close()
                         break
 
+            # Coroutine for rendering
+            async def render():
+                if type(renderer) == NullRenderer:
+                    return
+
+                cancelled = await renderer.render()
+                if cancelled:
+                    tracker.stop()
+                    t = asyncio.current_task()
+                    t.cancel()
+                cv2.destroyAllWindows()
+
             # Start the three coroutines and await till they finish
             try:
-                await asyncio.gather(produce_chunks_coro, send_chunks(), receive_results())
+                await asyncio.gather(produce_chunks_coro, send_chunks(), receive_results(), render())
             except Exception as e:
                 print(e)
                 print(f"Measurement {measurement_id} failed")
@@ -394,9 +413,8 @@ def logout(config, config_file):
     return True
 
 
-async def extract_video(chunk_queue, video_opts, tracker, collector, render_opts):
+async def extract_video(chunk_queue, video_opts, tracker, collector, renderer):
     videocap, fps, rotation, frames_to_process, frame_duration_ns = video_opts
-    render, video_file_name = render_opts
 
     # Start the DFX SDK collection
     collector.startCollection()
@@ -442,17 +460,16 @@ async def extract_video(chunk_queue, video_opts, tracker, collector, render_opts
         # We should really be getting this from OpenCV but it's unreliable...
         frame_number += 1
 
-        # Rendering
-        if render:
-            render_image = np.copy(image)
-            draw_on_image(dfx_frame, render_image, video_file_name, frame_number, frames_to_process, fps, True, None,
-                          None)
+        await renderer.put_nowait((image, (dfx_frame, frame_number)))
 
-            cv2.imshow(f"dfxdemo {_version}", render_image)
-            cv2.waitKey(1)  # TODO: Handle cancellation
+    # Stop the tracker
+    tracker.stop()
 
     # Signal to send_chunks that we are done
     await chunk_queue.put(None)
+
+    # Signal to render_queue that we are done
+    renderer.keep_render_last_frame()
 
 
 async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files):
