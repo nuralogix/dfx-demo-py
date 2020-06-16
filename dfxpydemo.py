@@ -11,7 +11,6 @@ import string
 
 import aiohttp
 import cv2
-import numpy as np
 
 import libdfx as dfxsdk
 import dfx_apiv2_client as dfxapi
@@ -111,8 +110,9 @@ async def main(args):
         print("Please select a study first using 'study select'")
         return
 
-    # Prepare for making a measurement
+    # Prepare for making a measurement..
     if args.subcommand == "make":
+        # ..using a video
         # Open video or camera (or FAIL)
         videocap = cv2.VideoCapture(args.video_path)
         if not videocap.isOpened():
@@ -144,8 +144,9 @@ async def main(args):
         print("Created DFX Factory:", factory.getVersion())
         sdk_id = factory.getSdkId()
 
+        # Get study config data..
         if args.debug_study_cfg_file is None:
-            # Get study config data from API required to initialize DFX SDK collector (or FAIL)
+            # ..from API required to initialize DFX SDK collector (or FAIL)
             # TODO: Handle 404 properly here...
             async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
                 response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
@@ -157,6 +158,7 @@ async def main(args):
                     save_config(config, args.config_file)
             study_cfg_bytes = base64.standard_b64decode(config["study_cfg_data"])
         else:
+            # .. or from a file
             with open(args.debug_study_cfg_file, 'rb') as f:
                 study_cfg_bytes = f.read()
 
@@ -186,6 +188,7 @@ async def main(args):
             print(f"    enabled constraint: {constraint}")
 
     elif args.subcommand == "debug_make_from_chunks":
+        # .. or using previously saved chunks
         payload_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "payload*.bin")))
         meta_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "metadata*.bin")))
         prop_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "properties*.json")))
@@ -228,7 +231,7 @@ async def main(args):
             # Queue to pass chunks between coroutines
             chunk_queue = asyncio.Queue(number_chunks)
 
-            # When we receive `results_expected` results, we close the WebSocket in the receive loop
+            # When we receive `results_expected` results, we close the WebSocket in `receive_results`
             results_expected = number_chunks
 
             # Coroutine to produce chunks and put then in chunk_queue
@@ -272,7 +275,7 @@ async def main(args):
 
                     chunk_queue.task_done()
 
-            # Coroutine to receive responses using Websocket
+            # Coroutine to receive responses using the Websocket
             async def receive_results():
                 num_results_received = 0
                 async for msg in ws:
@@ -293,24 +296,27 @@ async def main(args):
                     return
 
                 cancelled = await renderer.render()
+                cv2.destroyAllWindows()
                 if cancelled:
                     tracker.stop()
-                    t = asyncio.current_task()
-                    t.cancel()
-                cv2.destroyAllWindows()
+                    raise ValueError("Measurement was cancelled by user.")
 
-            # Start the three coroutines and await till they finish
-            try:
-                await asyncio.gather(produce_chunks_coro, send_chunks(), receive_results(), render())
-            except Exception as e:
-                print(e)
+            # Start the coroutines and wait till they finish
+            coroutines = [produce_chunks_coro, send_chunks(), receive_results(), render()]
+            done, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_EXCEPTION)
+            for p in pending:  # If there were any pending coroutines, cancel them here...
+                p.cancel()
+            if len(pending) > 0:  # If we had pending coroutines, it means something went wrong in the 'done' ones
+                for d in done:
+                    e = d.exception()
+                    if type(e) != asyncio.CancelledError:
+                        print(e)
                 print(f"Measurement {measurement_id} failed")
-                return
-
-        print(f"Measurement {measurement_id} complete")
-        config["last_measurement"] = measurement_id
-        save_config(config, args.config_file)
-        print("Use 'python dfxpydemo.py meas get' to get comprehensive results")
+            else:
+                config["last_measurement"] = measurement_id
+                save_config(config, args.config_file)
+                print(f"Measurement {measurement_id} completed")
+                print(f"Use 'python {os.path.basename(__file__)} meas get' to get comprehensive results")
 
 
 def load_config(config_file):
