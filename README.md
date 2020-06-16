@@ -80,7 +80,7 @@ token. This is generally the first thing you have to do (unless you don't want
 to make a measurement.)
 
 ```shell
-python dfxdemo.py orgs register <your_license_key>
+python dfxdemo.py org register <your_license_key>
 ```
 
 **Note**: By default, the demo stores tokens in a file called `config.json`.
@@ -91,12 +91,12 @@ python dfxdemo.py orgs register <your_license_key>
 Login as a user to obtain a user token.
 
 ```shell
-python dfxdemo.py users login <email> <password>
+python dfxdemo.py user login <email> <password>
 ```
 
----
-
 **Note**: All the commands below, use the tokens obtained above.
+
+---
 
 ### Studies
 
@@ -108,13 +108,13 @@ Study is a collection of biosignals of interest that are computed in one pass.
 
 ```shell
 python dfxdemo.py studies list
-python dfxdemo.py studies get <study_id>
+python dfxdemo.py study get <study_id>
 ```
 
 Select a study for use in measurements.
 
 ```shell
-python dfxdemo.py studies select <study_id>
+python dfxdemo.py study select <study_id>
 ```
 
 ### Measurements
