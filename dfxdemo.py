@@ -15,14 +15,14 @@ import pkg_resources
 import libdfx as dfxsdk
 import dfx_apiv2_client as dfxapi
 
-from dfxpydemoutils.dlib_tracker import DlibTracker
-from dfxpydemoutils.opencvhelpers import OpenCvHelpers
-from dfxpydemoutils.prettyprint import PrettyPrinter as PP
-from dfxpydemoutils.renderer import NullRenderer, Renderer
-from dfxpydemoutils.sdkhelpers import DfxSdkHelpers
+from dfxutils.dlib_tracker import DlibTracker
+from dfxutils.opencvhelpers import OpenCvHelpers
+from dfxutils.prettyprint import PrettyPrinter as PP
+from dfxutils.renderer import NullRenderer, Renderer
+from dfxutils.sdkhelpers import DfxSdkHelpers
 
 try:
-    _version = f"v{pkg_resources.require('dfxpydemo')[0].version}"
+    _version = f"v{pkg_resources.require('dfxdemo')[0].version}"
 except Exception:
     _version = ""
 
@@ -514,6 +514,7 @@ async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
 
 def cmdline():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {_version} (libdfx v{dfxsdk.__version__})")
     parser.add_argument("--config_file", default="./config.json")
     pp_group = parser.add_mutually_exclusive_group()
     pp_group.add_argument("--json", help="Print as JSON", action="store_true", default=False)
