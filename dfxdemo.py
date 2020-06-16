@@ -42,7 +42,7 @@ async def main(args):
     # Handle various command line subcommands
 
     # Handle "orgs" (Organizations) commands - "register" and "unregister"
-    if args.command == "orgs":
+    if args.command in ["o", "org", "orgs"]:
         if args.subcommand == "unregister":
             success = await unregister(config, args.config_file)
         else:
@@ -53,7 +53,7 @@ async def main(args):
         return
 
     # Handle "users" commands - "login" and "logout"
-    if args.command == "users":
+    if args.command in ["u", "user", "users"]:
         if args.subcommand == "logout":
             success = logout(config, args.config_file)
         else:
@@ -73,7 +73,7 @@ async def main(args):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Handle "studies" commands - "get", "list" and "select"
-    if args.command == "studies":
+    if args.command in ["s", "study", "studies"]:
         async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
             if args.subcommand == "get":
                 study_id = config["selected_study"] if args.study_id is None else args.study_id
@@ -90,8 +90,8 @@ async def main(args):
                 save_config(config, args.config_file)
         return
 
-    # Handle "meas" (Measurements) commands - "get" and "list"
-    if args.command == "meas" and "make" not in args.subcommand:
+    # Handle "measure" (Measurements) commands - "get" and "list"
+    if args.command in ["m", "measure", "measurements"] and "make" not in args.subcommand:
         async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
             if args.subcommand == "get":
                 measurement_id = config["last_measurement"] if args.measurement_id is None else args.measurement_id
@@ -105,8 +105,8 @@ async def main(args):
                 print(json.dumps(measurements)) if args.json else PP.print_pretty(measurements, args.csv)
         return
 
-    # Handle "meas" (Measurements) commands - "make" and "debug_make_from_chunks"
-    assert args.command == "meas" and "make" in args.subcommand
+    # Handle "measure" (Measurements) commands - "make" and "debug_make_from_chunks"
+    assert args.command in ["m", "measure", "measurements"] and "make" in args.subcommand
 
     # Verify preconditions
     if not config["selected_study"]:
@@ -319,7 +319,7 @@ async def main(args):
                 config["last_measurement"] = measurement_id
                 save_config(config, args.config_file)
                 print(f"Measurement {measurement_id} completed")
-                print(f"Use 'python {os.path.basename(__file__)} meas get' to get comprehensive results")
+                print(f"Use 'python {os.path.basename(__file__)} measure get' to get comprehensive results")
 
 
 def load_config(config_file):
@@ -514,27 +514,31 @@ async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
 
 def cmdline():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {_version} (libdfx v{dfxsdk.__version__})")
+    parser.add_argument("-v",
+                        "--version",
+                        action="version",
+                        version=f"%(prog)s {_version} (libdfx v{dfxsdk.__version__})")
     parser.add_argument("--config_file", default="./config.json")
     pp_group = parser.add_mutually_exclusive_group()
     pp_group.add_argument("--json", help="Print as JSON", action="store_true", default=False)
     pp_group.add_argument("--csv", help="Print grids as CSV", action="store_true", default=False)
 
     subparser_top = parser.add_subparsers(dest="command", required=True)
-    subparser_orgs = subparser_top.add_parser("orgs", help="Organizations").add_subparsers(dest="subcommand",
-                                                                                           required=True)
+    subparser_orgs = subparser_top.add_parser("orgs", aliases=["o", "org"],
+                                              help="Organizations").add_subparsers(dest="subcommand", required=True)
     register_parser = subparser_orgs.add_parser("register", help="Register device")
     register_parser.add_argument("license_key", help="DFX API Organization License")
     unregister_parser = subparser_orgs.add_parser("unregister", help="Unregister device")
 
-    subparser_users = subparser_top.add_parser("users", help="Users").add_subparsers(dest="subcommand", required=True)
+    subparser_users = subparser_top.add_parser("users", aliases=["u", "user"],
+                                               help="Users").add_subparsers(dest="subcommand", required=True)
     login_parser = subparser_users.add_parser("login", help="User login")
     login_parser.add_argument("email", help="Email address")
     login_parser.add_argument("password", help="Password")
     logout_parser = subparser_users.add_parser("logout", help="User logout")
 
-    subparser_studies = subparser_top.add_parser("studies", help="Studies").add_subparsers(dest="subcommand",
-                                                                                           required=True)
+    subparser_studies = subparser_top.add_parser("studies", aliases=["s", "study"],
+                                                 help="Studies").add_subparsers(dest="subcommand", required=True)
     study_list_parser = subparser_studies.add_parser("list", help="List existing studies")
     study_get_parser = subparser_studies.add_parser("get", help="Retrieve a study's information")
     study_get_parser.add_argument("study_id",
@@ -544,8 +548,8 @@ def cmdline():
     study_list_parser = subparser_studies.add_parser("select", help="Select a study to use")
     study_list_parser.add_argument("study_id", help="ID of study to use", type=str)
 
-    subparser_meas = subparser_top.add_parser("meas", help="Measurements").add_subparsers(dest="subcommand",
-                                                                                          required=True)
+    subparser_meas = subparser_top.add_parser("measure", aliases=["m", "measurements"],
+                                              help="Measurements").add_subparsers(dest="subcommand", required=True)
     list_parser = subparser_meas.add_parser("list", help="List existing measurements")
     list_parser.add_argument("--limit", help="Number of measurements to retrieve (default : 10)", type=int, default=10)
     get_parser = subparser_meas.add_parser("get", help="Retrieve a measurement")
