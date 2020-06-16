@@ -5,18 +5,21 @@ import glob
 import json
 import math
 import os.path
-import pkg_resources
 import random
 import string
 
 import aiohttp
 import cv2
+import pkg_resources
 
 import libdfx as dfxsdk
 import dfx_apiv2_client as dfxapi
 
-from dfxpydemoutils import (DlibTracker, Renderer, NullRenderer, dfx_face_from_json, find_video_rotation,
-                            sdk_result_to_dict, print_sdk_result, print_meas, print_pretty, read_next_frame, save_chunk)
+from dfxpydemoutils.dlib_tracker import DlibTracker
+from dfxpydemoutils.opencvhelpers import OpenCvHelpers
+from dfxpydemoutils.prettyprint import PrettyPrinter as PP
+from dfxpydemoutils.renderer import NullRenderer, Renderer
+from dfxpydemoutils.sdkhelpers import DfxSdkHelpers
 
 try:
     _version = f"v{pkg_resources.require('dfxpydemo')[0].version}"
@@ -78,10 +81,10 @@ async def main(args):
                     print("Please select a study or pass a study id")
                     return
                 study = await dfxapi.Studies.retrieve(session, study_id)
-                print(json.dumps(study)) if args.json else print_pretty(study, args.csv)
+                print(json.dumps(study)) if args.json else PP.print_pretty(study, args.csv)
             elif args.subcommand == "list":
                 studies = await dfxapi.Studies.list(session)
-                print(json.dumps(studies)) if args.json else print_pretty(studies, args.csv)
+                print(json.dumps(studies)) if args.json else PP.print_pretty(studies, args.csv)
             elif args.subcommand == "select":
                 config["selected_study"] = args.study_id
                 save_config(config, args.config_file)
@@ -96,10 +99,10 @@ async def main(args):
                     print("Please complete a measurement first or pass a measurement id")
                     return
                 results = await dfxapi.Measurements.retrieve(session, measurement_id)
-                print(json.dumps(results)) if args.json else print_meas(results, args.csv)
+                print(json.dumps(results)) if args.json else PP.print_result(results, args.csv)
             elif args.subcommand == "list":
                 measurements = await dfxapi.Measurements.list(session, limit=args.limit)
-                print(json.dumps(measurements)) if args.json else print_pretty(measurements, args.csv)
+                print(json.dumps(measurements)) if args.json else PP.print_pretty(measurements, args.csv)
         return
 
     # Handle "meas" (Measurements) commands - "make" and "debug_make_from_chunks"
@@ -126,7 +129,7 @@ async def main(args):
         if frames_to_process / fps > 120:
             print(f"Video duration {frames_to_process / fps:.1f}s is longer than 120s, processing first 120s only.")
             frames_to_process = int(fps * 120)
-        rotation = await find_video_rotation(args.video_path)
+        rotation = await OpenCvHelpers.find_video_rotation(args.video_path)
         frame_duration_ns = 1000000000.0 / fps
 
         # Create a DlibTracker (or FAIL)
@@ -270,7 +273,7 @@ async def main(args):
 
                     # Save chunk (for debugging purposes)
                     if "debug_save_chunks_folder" in args and args.debug_save_chunks_folder:
-                        save_chunk(chunk, args.debug_save_chunks_folder)
+                        DfxSdkHelpers.save_chunk(chunk, args.debug_save_chunks_folder)
                         print(f"Saved chunk {chunk.chunk_number} in '{args.debug_save_chunks_folder}'")
 
                     chunk_queue.task_done()
@@ -282,9 +285,9 @@ async def main(args):
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
                     if request_id == results_request_id and len(payload) > 0:
                         sdk_result = collector.decodeMeasurementResult(payload)
-                        result = sdk_result_to_dict(sdk_result)
+                        result = DfxSdkHelpers.sdk_result_to_dict(sdk_result)
                         renderer.set_results(result.copy())
-                        print_sdk_result(result)
+                        PP.print_sdk_result(result)
                         num_results_received += 1
                     if num_results_received == results_expected:
                         await ws.close()
@@ -428,7 +431,7 @@ async def extract_video(chunk_queue, video_opts, tracker, collector, renderer):
     # Read frames from the video, track faces and extract using collector
     frame_number = 0
     while True:
-        read, image = await read_next_frame(videocap, fps, rotation, False)
+        read, image = await OpenCvHelpers.read_next_frame(videocap, fps, rotation, False)
         if not read or image is None or frame_number >= frames_to_process:
             # Video ended, so grab what should be the last, possibly truncated chunk
             collector.forceComplete()
@@ -447,7 +450,7 @@ async def extract_video(chunk_queue, video_opts, tracker, collector, renderer):
         dfx_frame = collector.createFrame(dfx_video_frame)
         if len(tracked_faces) > 0:
             tracked_face = next(iter(tracked_faces.values()))  # We only care about the first face
-            dfx_face = dfx_face_from_json(collector, tracked_face)
+            dfx_face = DfxSdkHelpers.dfx_face_from_json(collector, tracked_face)
             dfx_frame.addFace(dfx_face)
 
         # Do the extraction
