@@ -45,8 +45,6 @@ class Renderer():
         if cancelled:
             return cancelled
 
-        self.set_message("Press Esc to exit")
-
         # Keep rendering the last frame at 10fps as we display results
         while self._rendering_last:
             await asyncio.sleep(0.1)
@@ -102,21 +100,25 @@ class Renderer():
                                   color=(255, 255, 0),
                                   thickness=1,
                                   lineType=cv2.LINE_AA)
-        # Render status
-        c = 5
-        r = 20
-        if self._measuring:
-            msg = f"Extracting from {self._image_src_name} - {self._total_frames - frame_number} frames left ({self._fps:.2f} fps)"
-        else:
-            msg = f"Reading from {self._image_src_name} - ({self._fps:.2f} fps)"
+        # Render filename and framerate
+        c = 2
+        r = 15
+        msg = f"{self._image_src_name} ({self._fps:.2f} fps)"
         r = self._draw_text(msg, render_image, (c, r))
 
         # Render the message
         if self._message:
             r = self._draw_text(self._message, render_image, (c, r), fg=(255, 0, 0))
 
-        # Render chunk numbers and results
         r += 10
+        # Render progress
+        if self._measuring:
+            if frame_number < self._total_frames:
+                r = self._draw_text(f"Processing frame {frame_number} of {self._total_frames}", render_image, (c, r))
+            else:
+                r = self._draw_text(f"Processed all {self._total_frames} frames", render_image, (c, r))
+
+        # Render chunk numbers and results
         if self._sent_chunk is not None:
             r = self._draw_text(f"Sent chunk: {self._sent_chunk + 1} of {self._total_chunks}", render_image, (c, r))
         if self._results:
@@ -127,15 +129,15 @@ class Renderer():
 
         # Render the current time (so user knows things aren't frozen)
         now = datetime.datetime.now()
-        self._draw_text(f"{now.hour:02d}:{now.minute:02d}:{now.second:02d}",
-                        render_image, (render_image.shape[1] - 90, render_image.shape[0] - 20),
+        self._draw_text(f"{now.strftime('%X')}",
+                        render_image, (render_image.shape[1] - 70, 15),
                         fg=(0, 128, 0) if now.second % 2 == 0 else (0, 0, 0))
 
     def _draw_text(self, msg, render_image, origin, fs=None, fg=None, bg=None):
         FONT = cv2.FONT_HERSHEY_SIMPLEX
         AA = cv2.LINE_AA
         THICK = 1
-        PAD = 2
+        PAD = 3
         fs = 0.45 if fs is None else fs * 0.45
         fg = (0, 0, 0) if fg is None else fg
         bg = (255, 255, 255) if bg is None else bg
@@ -147,7 +149,7 @@ class Renderer():
                       thickness=-1)
         cv2.putText(render_image, msg, origin, FONT, fs, fg, THICK, AA)
 
-        return origin[1] + sz[1] + baseline
+        return origin[1] + sz[1] + baseline + 1
 
 
 class NullRenderer():

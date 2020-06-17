@@ -241,7 +241,8 @@ async def main(args):
             if args.subcommand == "make":
                 renderer = Renderer(_version, os.path.basename(args.video_path), frames_to_process, fps, measurement_id,
                                     number_chunks, 0.5) if not args.no_render else NullRenderer()
-                renderer.set_message("Press Esc to cancel")
+                renderer.set_message("Extracting - press Esc to cancel")
+                print("Extraction started")
                 produce_chunks_coro = extract_video(
                     chunk_queue,  # Chunks will be put into this queue
                     (videocap, fps, rotation, frames_to_process, frame_duration_ns),  # Video capture
@@ -250,8 +251,8 @@ async def main(args):
                     renderer  # Rendering
                 )
             else:  # args.subcommand == "debug_make_from_chunks":
-                produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
                 renderer = NullRenderer()
+                produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
 
             # Coroutine to get chunks from chunk_queue and send chunk using WebSocket
             async def send_chunks():
@@ -277,6 +278,8 @@ async def main(args):
                         print(f"Saved chunk {chunk.chunk_number} in '{args.debug_save_chunks_folder}'")
 
                     chunk_queue.task_done()
+                renderer.set_message("Waiting for results - Press Esc to cancel")
+                print("Extraction complete, waiting for results")
 
             # Coroutine to receive responses using the Websocket
             async def receive_results():
@@ -292,6 +295,8 @@ async def main(args):
                     if num_results_received == results_expected:
                         await ws.close()
                         break
+                renderer.set_message("Measurement complete - press Esc to exit")
+                print("Measurement complete")
 
             # Coroutine for rendering
             async def render():
