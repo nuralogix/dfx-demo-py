@@ -1,57 +1,58 @@
 import asyncio
 
 import cv2
+from pymediainfo import MediaInfo
 
 
-class OpenCvHelpers:
-    @staticmethod
-    async def find_video_rotation(video_path):
-        """Find video rotation using ffprobe."""
-        angle = 0
-        ffprobe_cmd = "ffprobe -v quiet -select_streams v:0 -show_entries " \
-                    "stream_tags=rotate -of default=nw=1:nk=1".split(' ')
-        ffprobe_cmd.append(video_path)
-        try:
-            proc = await asyncio.create_subprocess_exec(*ffprobe_cmd, stdout=asyncio.subprocess.PIPE)
-            op, err = await proc.communicate()
-            op = op.decode()
-            for line in op.split('\n'):
-                if "90" in line:
-                    angle = 90
-                elif "180" in line:
-                    angle = 180
-                elif "270" in line:
-                    angle = 270
-        except OSError:
-            # Likely couldn't find ffprobe
-            pass
+class VideoReader:
+    def __init__(self, video_path, start_time=None, end_time=None, mirror=False) -> None:
+        self._videocap = cv2.VideoCapture(video_path)
+        if not self._videocap.isOpened():
+            raise RuntimeError(f"Could not open {video_path}")
 
-        if angle < 0:
-            angle = angle + 360
+        self.fps = self._videocap.get(cv2.CAP_PROP_FPS)
+        if self.fps <= 0:
+            raise RuntimeError(f"Video framerate {self.fps} is invalid. Please override using '--fps' parameter.")
 
-        return angle
+        self.frames_to_process = int(self._videocap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if self.frames_to_process / self.fps > 120:
+            print(
+                f"Video duration {self.frames_to_process / self.fps:.1f}s is longer than 120s, processing first 120s only."
+            )
+            self.frames_to_process = int(self.fps * 120)
 
-    @staticmethod
-    async def read_next_frame(video_cap, target_fps, rotation, mirror):
-        if target_fps > 0:
-            await asyncio.sleep(1.0 / target_fps)
+        self.rotation = self._find_video_rotation(video_path)
+        self.mirror = mirror
+        self.frame_duration_ns = 1000000000.0 / self.fps
+
+    def _find_video_rotation(self, video_path):
+        mi = MediaInfo.parse(video_path)
+        for track in mi.tracks:
+            if track.track_type == "Video":
+                return track.rotation
+        return 0
+
+    async def read_next_frame(self):
+        if self.fps > 0:
+            await asyncio.sleep(1.0 / self.fps)
         else:
             await asyncio.sleep(0.033)
 
-        read, frame = video_cap.read()
+        frame_number = int(self._videocap.get(cv2.CAP_PROP_POS_FRAMES))
+        read, frame = self._videocap.read()
 
-        if read and frame is not None and frame.size != 0:
+        if read and frame is not None and frame.size != 0 and frame_number < self.frames_to_process:
             # Mirror frame if necessary
-            if mirror:
+            if self.mirror:
                 frame = cv2.flip(frame, 1)
 
             # Rotate frame if necessary
-            if rotation == 90:
+            if self.rotation == 90:
                 frame = cv2.transpose(frame)
                 frame = cv2.flip(frame, 1)
-            elif rotation == 180:
+            elif self.rotation == 180:
                 frame = cv2.flip(frame, -1)
-            elif rotation == 270:
+            elif self.rotation == 270:
                 frame = cv2.transpose(frame)
                 frame = cv2.flip(frame, 0)
             else:  # 0 or some other weird result
@@ -61,4 +62,4 @@ class OpenCvHelpers:
             read = False
             frame = None
 
-        return read, frame
+        return read, frame, frame_number

@@ -16,7 +16,7 @@ import libdfx as dfxsdk
 import dfx_apiv2_client as dfxapi
 
 from dfxutils.dlib_tracker import DlibTracker
-from dfxutils.opencvhelpers import OpenCvHelpers
+from dfxutils.opencvhelpers import VideoReader
 from dfxutils.prettyprint import PrettyPrinter as PP
 from dfxutils.renderer import NullRenderer, Renderer
 from dfxutils.sdkhelpers import DfxSdkHelpers
@@ -113,61 +113,29 @@ async def main(args):
         print("Please select a study first using 'study select'")
         return
 
-    # Prepare for making a measurement..
+    # Prepare to make a measurement..
     if args.subcommand == "make":
         # ..using a video
-        # Open video or camera (or FAIL)
-        videocap = cv2.VideoCapture(args.video_path)
-        if not videocap.isOpened():
-            print(f"Could not open {args.video_path}")
-            return
-        fps = videocap.get(cv2.CAP_PROP_FPS)
-        if fps <= 0:
-            print(f"Video framerate {fps} is invalid. Please override using '--fps' parameter.")
-            return
-        frames_to_process = int(videocap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if frames_to_process / fps > 120:
-            print(f"Video duration {frames_to_process / fps:.1f}s is longer than 120s, processing first 120s only.")
-            frames_to_process = int(fps * 120)
-        rotation = await OpenCvHelpers.find_video_rotation(args.video_path)
-        frame_duration_ns = 1000000000.0 / fps
-
-        # Create a DlibTracker (or FAIL)
-        tracker = None
         try:
+            vid = VideoReader(args.video_path)
             tracker = DlibTracker()
-        except RuntimeError as e:
+
+            # Create DFX SDK factory
+            factory = dfxsdk.Factory()
+            print("Created DFX Factory:", factory.getVersion())
+            sdk_id = factory.getSdkId()
+
+            # Get study config data..
+            if args.debug_study_cfg_file is None:
+                # ..from API required to initialize DFX SDK collector (or FAIL)
+                study_cfg_bytes = await retrieve_sdk_config(headers, config, args.config_file, sdk_id)
+            else:
+                # .. or from a file
+                with open(args.debug_study_cfg_file, 'rb') as f:
+                    study_cfg_bytes = f.read()
+        except Exception as e:
             print(e)
-            print("Please download and unzip "
-                  "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2 into 'res' folder")
             return
-
-        # Create DFX SDK factory
-        factory = dfxsdk.Factory()
-        print("Created DFX Factory:", factory.getVersion())
-        sdk_id = factory.getSdkId()
-
-        # Get study config data..
-        if args.debug_study_cfg_file is None:
-            # ..from API required to initialize DFX SDK collector (or FAIL)
-            async with aiohttp.ClientSession(headers=headers) as session:
-                status, response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
-                if status < 400:
-                    if response["MD5Hash"] != config["study_cfg_hash"]:
-                        _, response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"],
-                                                                                    sdk_id)
-                        config["study_cfg_hash"] = response["MD5Hash"]
-                        config["study_cfg_data"] = response["ConfigFile"]
-                        print(f"Retrieved new dfxsdk config data with md5: {config['study_cfg_hash']}")
-                        save_config(config, args.config_file)
-                else:
-                    print(f"Could not retrieve dfxsdk config data for study {config['study_cfg_hash']}. Please contact Nuralogix.")
-                    return
-            study_cfg_bytes = base64.standard_b64decode(config["study_cfg_data"])
-        else:
-            # .. or from a file
-            with open(args.debug_study_cfg_file, 'rb') as f:
-                study_cfg_bytes = f.read()
 
         # Create DFX SDK collector (or FAIL)
         if not factory.initializeStudy(study_cfg_bytes):
@@ -181,11 +149,11 @@ async def main(args):
 
         print("Created DFX Collector:")
         chunk_duration_s = float(args.chunk_duration_s)
-        frames_per_chunk = math.ceil(chunk_duration_s * fps)
-        number_chunks = math.ceil(frames_to_process / frames_per_chunk)
+        frames_per_chunk = math.ceil(chunk_duration_s * vid.fps)
+        number_chunks = math.ceil(vid.frames_to_process / frames_per_chunk)
 
         # Set collector config
-        collector.setTargetFPS(fps)
+        collector.setTargetFPS(vid.fps)
         collector.setChunkDurationSeconds(chunk_duration_s)
         collector.setNumberChunks(number_chunks)
         print(f"    mode: {factory.getMode()}")
@@ -244,13 +212,13 @@ async def main(args):
 
             # Coroutine to produce chunks and put then in chunk_queue
             if args.subcommand == "make":
-                renderer = Renderer(_version, os.path.basename(args.video_path), frames_to_process, fps, measurement_id,
-                                    number_chunks, 0.5) if not args.no_render else NullRenderer()
+                renderer = Renderer(_version, os.path.basename(args.video_path), vid.frames_to_process, vid.fps,
+                                    measurement_id, number_chunks, 0.5) if not args.no_render else NullRenderer()
                 renderer.set_message("Extracting - press Esc to cancel")
                 print("Extraction started")
                 produce_chunks_coro = extract_video(
                     chunk_queue,  # Chunks will be put into this queue
-                    (videocap, fps, rotation, frames_to_process, frame_duration_ns),  # Video capture
+                    vid,  # Video reader
                     tracker,  # Face tracker
                     collector,  # DFX SDK collector needed to create chunks
                     renderer  # Rendering
@@ -443,17 +411,32 @@ def logout(config, config_file):
     return True
 
 
-async def extract_video(chunk_queue, video_opts, tracker, collector, renderer):
-    videocap, fps, rotation, frames_to_process, frame_duration_ns = video_opts
+async def retrieve_sdk_config(headers, config, config_file, sdk_id):
+    async with aiohttp.ClientSession(headers=headers) as session:
+        status, response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
+        if status < 400:
+            if response["MD5Hash"] != config["study_cfg_hash"]:
+                _, response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"], sdk_id)
+                config["study_cfg_hash"] = response["MD5Hash"]
+                config["study_cfg_data"] = response["ConfigFile"]
+                print(f"Retrieved new DFX SDK config data with md5: {config['study_cfg_hash']}")
+                save_config(config, config_file)
+        else:
+            raise RuntimeError(
+                f"Could not retrieve DFX SDK config data for Study ID {config['study_cfg_hash']}. Please contact Nuralogix"
+            )
 
+        return base64.standard_b64decode(config["study_cfg_data"])
+
+
+async def extract_video(chunk_queue, vid, tracker, collector, renderer):
     # Start the DFX SDK collection
     collector.startCollection()
 
     # Read frames from the video, track faces and extract using collector
-    frame_number = 0
     while True:
-        read, image = await OpenCvHelpers.read_next_frame(videocap, fps, rotation, False)
-        if not read or image is None or frame_number >= frames_to_process:
+        read, image, frame_number = await vid.read_next_frame()
+        if not read or image is None:
             # Video ended, so grab what should be the last, possibly truncated chunk
             collector.forceComplete()
             chunk_data = collector.getChunkData()
@@ -466,7 +449,7 @@ async def extract_video(chunk_queue, video_opts, tracker, collector, renderer):
         tracked_faces = tracker.trackFaces(image)
 
         # Create a DFX VideoFrame, then a DFX Frame from the DFX VideoFrame and add DFX faces to it
-        dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_number * frame_duration_ns,
+        dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_number * vid.frame_duration_ns,
                                             dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR)
         dfx_frame = collector.createFrame(dfx_video_frame)
         if len(tracked_faces) > 0:
@@ -486,9 +469,6 @@ async def extract_video(chunk_queue, video_opts, tracker, collector, renderer):
                 await chunk_queue.put(chunk)
             if result == dfxsdk.CollectorState.COMPLETED:
                 break
-
-        # We should really be getting this from OpenCV but it's unreliable...
-        frame_number += 1
 
         await renderer.put_nowait((image, (dfx_frame, frame_number)))
 

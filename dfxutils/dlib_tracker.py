@@ -9,24 +9,29 @@ import numpy as np
 
 class DlibTracker():
     def __init__(self, face_detect_strategy=None):
-        self._detect_proc = None
+        try:
+            self._detect_proc = None
 
-        this_directory = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(this_directory, "res", "shape_predictor_68_face_landmarks.dat")
+            this_directory = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(this_directory, "res", "shape_predictor_68_face_landmarks.dat")
 
-        self._face_detector = dlib.get_frontal_face_detector()
-        self._pose_estimator = dlib.shape_predictor(model_path)
-        self._smoothed = {pt: ([], []) for pt in DlibTracker._dlib2mpeg4}
-        if face_detect_strategy is None:
-            face_detect_strategy = "smart"
-        self._fd_fast = face_detect_strategy != "brute"
-        self._fd_smart = face_detect_strategy == "smart"
-        if self._fd_fast:
-            self._last_detected_faces = []
-            self._work_queue = mp.Queue(1)
-            self._results_queue = mp.Queue(1)
-            self._detect_proc = mp.Process(target=self._detectFacesThreaded, name="dlib_tracker")
-            self._detect_proc.start()
+            self._face_detector = dlib.get_frontal_face_detector()
+            self._pose_estimator = dlib.shape_predictor(model_path)
+            self._smoothed = {pt: ([], []) for pt in DlibTracker._dlib2mpeg4}
+            if face_detect_strategy is None:
+                face_detect_strategy = "smart"
+            self._fd_fast = face_detect_strategy != "brute"
+            self._fd_smart = face_detect_strategy == "smart"
+            if self._fd_fast:
+                self._last_detected_faces = []
+                self._work_queue = mp.Queue(1)
+                self._results_queue = mp.Queue(1)
+                self._detect_proc = mp.Process(target=self._detectFacesThreaded, name="dlib_tracker")
+                self._detect_proc.start()
+        except RuntimeError:
+            print("Please download and unzip "
+                  "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2 into 'res' folder")
+            raise
 
     @staticmethod
     def __version__():
