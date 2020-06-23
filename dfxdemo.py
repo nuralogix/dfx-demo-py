@@ -33,7 +33,7 @@ async def main(args):
 
     # Check API status
     async with aiohttp.ClientSession(raise_for_status=True) as session:
-        api_status = await dfxapi.General.api_status(session)
+        _, api_status = await dfxapi.General.api_status(session)
         if not api_status["StatusID"] == "ACTIVE":
             print(f"DFX API Status: {api_status['StatusID']} ({dfxapi.Settings.rest_url})")
 
@@ -80,10 +80,10 @@ async def main(args):
                 if not study_id or study_id.isspace():
                     print("Please select a study or pass a study id")
                     return
-                study = await dfxapi.Studies.retrieve(session, study_id)
+                _, study = await dfxapi.Studies.retrieve(session, study_id)
                 print(json.dumps(study)) if args.json else PP.print_pretty(study, args.csv)
             elif args.subcommand == "list":
-                studies = await dfxapi.Studies.list(session)
+                _, studies = await dfxapi.Studies.list(session)
                 print(json.dumps(studies)) if args.json else PP.print_pretty(studies, args.csv)
             elif args.subcommand == "select":
                 config["selected_study"] = args.study_id
@@ -98,10 +98,10 @@ async def main(args):
                 if not measurement_id or measurement_id.isspace():
                     print("Please complete a measurement first or pass a measurement id")
                     return
-                results = await dfxapi.Measurements.retrieve(session, measurement_id)
+                _, results = await dfxapi.Measurements.retrieve(session, measurement_id)
                 print(json.dumps(results)) if args.json else PP.print_result(results, args.csv)
             elif args.subcommand == "list":
-                measurements = await dfxapi.Measurements.list(session, limit=args.limit)
+                _, measurements = await dfxapi.Measurements.list(session, limit=args.limit)
                 print(json.dumps(measurements)) if args.json else PP.print_pretty(measurements, args.csv)
         return
 
@@ -150,15 +150,19 @@ async def main(args):
         # Get study config data..
         if args.debug_study_cfg_file is None:
             # ..from API required to initialize DFX SDK collector (or FAIL)
-            # TODO: Handle 404 properly here...
-            async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
-                response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
-                if response["MD5Hash"] != config["study_cfg_hash"]:
-                    response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"], sdk_id)
-                    config["study_cfg_hash"] = response["MD5Hash"]
-                    config["study_cfg_data"] = response["ConfigFile"]
-                    print(f"Retrieved new study config data with md5: {config['study_cfg_hash']}")
-                    save_config(config, args.config_file)
+            async with aiohttp.ClientSession(headers=headers) as session:
+                status, response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
+                if status < 400:
+                    if response["MD5Hash"] != config["study_cfg_hash"]:
+                        _, response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"],
+                                                                                    sdk_id)
+                        config["study_cfg_hash"] = response["MD5Hash"]
+                        config["study_cfg_data"] = response["ConfigFile"]
+                        print(f"Retrieved new dfxsdk config data with md5: {config['study_cfg_hash']}")
+                        save_config(config, args.config_file)
+                else:
+                    print(f"Could not retrieve dfxsdk config data for study {config['study_cfg_hash']}. Please contact Nuralogix.")
+                    return
             study_cfg_bytes = base64.standard_b64decode(config["study_cfg_data"])
         else:
             # .. or from a file
@@ -222,7 +226,8 @@ async def main(args):
     # Make a measurement
     async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
         # Create a measurement on the API and get the measurement ID
-        measurement_id = await dfxapi.Measurements.create(session, config["selected_study"])
+        _, response = await dfxapi.Measurements.create(session, config["selected_study"])
+        measurement_id = response["ID"]
         print(f"Created measurement {measurement_id}")
 
         # Use the session to connect to the WebSocket
@@ -377,15 +382,19 @@ async def register(config, config_file, license_key):
         print("Already registered")
         return False
 
-    # TODO: Handle 404 properly here...
-    async with aiohttp.ClientSession(raise_for_status=True) as session:
-        await dfxapi.Organizations.register_license(session, license_key, "LINUX", "DFX Example", "DFXCLIENT", "0.0.1")
-        config["device_id"] = dfxapi.Settings.device_id
-        config["device_token"] = dfxapi.Settings.device_token
-        config["role_id"] = dfxapi.Settings.role_id
-        config["user_token"] = dfxapi.Settings.user_token
-        print(f"Register successful with new device id {config['device_id']}")
-    return True
+    async with aiohttp.ClientSession() as session:
+        status, body = await dfxapi.Organizations.register_license(session, license_key, "LINUX", "DFX Example",
+                                                                   "DFXCLIENT", "0.0.1")
+        if status < 400:
+            config["device_id"] = dfxapi.Settings.device_id
+            config["device_token"] = dfxapi.Settings.device_token
+            config["role_id"] = dfxapi.Settings.role_id
+            config["user_token"] = dfxapi.Settings.user_token
+            print(f"Register successful with new device id {config['device_id']}")
+            return True
+        else:
+            print(f"Register failed {status}: {body}")
+            return False
 
 
 async def unregister(config, config_file):
@@ -394,13 +403,16 @@ async def unregister(config, config_file):
         return False
 
     headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
-    async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
-        await dfxapi.Organizations.unregister_license(session)
-        print(f"Unregister successful for device id {config['device_id']}")
-        config["device_id"] = ""
-        config["device_token"] = ""
-        config["role_id"] = ""
-    return True
+    async with aiohttp.ClientSession(headers=headers) as session:
+        status, body = await dfxapi.Organizations.unregister_license(session)
+        if status < 400:
+            print(f"Unregister successful for device id {config['device_id']}")
+            config["device_id"] = ""
+            config["device_token"] = ""
+            config["role_id"] = ""
+            return True
+        else:
+            print(f"Unregister failed {status}: {body}")
 
 
 async def login(config, config_file, email, password):
@@ -413,11 +425,15 @@ async def login(config, config_file, email, password):
         return False
 
     headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
-    async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
-        await dfxapi.Users.login(session, email, password)
-        config["user_token"] = dfxapi.Settings.user_token
-        print("Login successful")
-    return True
+    async with aiohttp.ClientSession(headers=headers) as session:
+        status, body = await dfxapi.Users.login(session, email, password)
+        if status < 400:
+            config["user_token"] = dfxapi.Settings.user_token
+            print("Login successful")
+            return True
+        else:
+            print(f"Login failed {status}: {body}")
+            return False
 
 
 def logout(config, config_file):
