@@ -29,54 +29,59 @@ Please ensure you have the following software installed:
 * [Python 3.7 or newer (64-bit)](https://www.python.org/)
 * [Git](https://git-scm.com/)
 * C++ compiler and toolchain, capable of compiling Python extensions:
-  * [Visual Studio 2017 or newer](https://visualstudio.microsoft.com/) on Windows
-  * [Xcode](https://developer.apple.com/xcode/) on Apple (untested)
-  * gcc etc. on Linux
-    * On Ubuntu: `sudo apt-get install build-essential libopenblas-dev liblapack-dev`
+  * Windows: [Visual Studio 2017 or newer](https://visualstudio.microsoft.com/)
+  * macOS (untested): [Xcode](https://developer.apple.com/xcode/)
+  * Linux: gcc
+
+Note: On Ubuntu 18.04, the following commands should work
+
+```shell
+sudo apt-get install build-essential git # Compiler and Git
+sudo apt-get install python3.8-dev python3.8-venv # or 3.7
+sudo apt-get install libopenblas-dev liblapack-dev # for Dlib
+```
 
 ## Install `dfxdemo`
 
-1. Clone the dfxdemo application from Github.
+Clone the dfxdemo application from Github.
 
-    ```shell
-    git clone https://github.com/nuralogix/dfx-demo-py
-    ```
+```shell
+git clone https://github.com/nuralogix/dfx-demo-py
+```
 
-2. Create a Python virtual environment inside the cloned repo, activate it and
+Create a Python virtual environment inside the cloned repo, activate it and
 upgrade `pip`
 
-    ```shell
-    cd dfx-demo-py
-    python3 -m venv venv
-    source venv/bin/activate # on Windows: venv\Scripts\activate
-    python -m pip install --upgrade pip
-    ```
+  ```shell
+  cd dfx-demo-py
+  python3 -m venv venv
+  source venv/bin/activate # on Windows: venv\Scripts\activate
+  python -m pip install --upgrade pip
+  ```
 
-3. Download the [Python wheel for the DFX
-SDK](https://deepaffex.ai/developers-sdk) for your platform and install it in
-the Python virtual environment.
+Download the [Python wheel for the DFX SDK](https://deepaffex.ai/developers-sdk)
+for your platform and install it in the Python virtual environment.
 
-    ```shell
-    pip install /path/to/download/libdfxpython.whl
-    ```
+```shell
+pip install /path/to/download/libdfxpython.whl
+```
 
-4. Install `dfxdemo` in editable mode (and automatically install other
+Install `dfxdemo` in editable mode (and automatically install other
 dependencies.) This may take a while as [Dlib](http://dlib.net/) gets compiled.
 
-    ```shell
-    pip install -e .
-    ```
+```shell
+pip install -e .
+```
 
 ## Run `dfxdemo`
 
 `dfxdemo` has top-level commands that roughly correspond to the way the DFX API
-is organized . All commands have a `--help` argument you can pass to get more
-details.
+is organized. All commands and subcommands have a `--help` argument.
 
 ### Register your license
 
-Register your organization license on the DeepAffex Cloud to obtain a device
-token. This is generally the first thing you have to do (unless you don't want
+Register your organization license on the DeepAffex Cloud to obtain a *device
+token*. This is generally the first thing you have to do (unless you don't want
 to make a measurement.)
 
 ```shell
@@ -88,7 +93,7 @@ python dfxdemo.py org register <your_license_key>
 
 ### Login
 
-Login as a user to obtain a user token.
+Login as a user to obtain a *user token*.
 
 ```shell
 python dfxdemo.py user login <email> <password>
@@ -104,7 +109,8 @@ List the available DFX Studies and retrieve the details of the one you want to
 use.
 
 Note: The DeepAffex Cloud organizes around the concept of Studies - a DFX
-Study is a collection of biosignals of interest that are computed in one pass.
+Study is a collection of biosignals of interest that are computed in one
+measurement.
 
 ```shell
 python dfxdemo.py studies list
