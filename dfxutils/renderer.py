@@ -94,7 +94,7 @@ class Renderer():
         # Render the face polygons
         for faceID in dfxframe.getFaceIdentifiers():
             for regionID in dfxframe.getRegionNames(faceID):
-                if (dfxframe.getRegionIntProperty(faceID, regionID, "draw") != 0):
+                if dfxframe.getRegionIntProperty(faceID, regionID, "draw") != 0:
                     polygon = dfxframe.getRegionPolygon(faceID, regionID)
                     cv2.polylines(render_image, [np.round(np.array(polygon) * self._sf).astype(int)],
                                   isClosed=True,

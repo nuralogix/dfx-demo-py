@@ -109,7 +109,7 @@ class DlibTracker():
         xs, ys = self._smoothed[pointname]
         xs.append(newx)
         ys.append(newy)
-        if (len(xs) > framesToSmooth):
+        if len(xs) > framesToSmooth:
             self._smoothed[pointname] = xs[1:], ys[1:]
         smoothedx = median(xs)
         smoothedy = median(ys)
