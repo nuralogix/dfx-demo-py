@@ -6,11 +6,12 @@ import numpy as np
 
 
 class Renderer():
-    def __init__(self, version, image_src_name, total_frames, fps, measurement_id, total_chunks, sf=1.0):
+    def __init__(self, version, image_src_name, first_frame, last_frame, fps, measurement_id, total_chunks, sf=1.0):
         self._render_queue = asyncio.Queue(1)
         self._version = version
         self._image_src_name = image_src_name
-        self._total_frames = total_frames
+        self._first_frame = first_frame
+        self._last_frame = last_frame
         self._fps = fps
         self._measurement_id = measurement_id
         self._total_chunks = total_chunks
@@ -113,10 +114,22 @@ class Renderer():
         r += 10
         # Render progress
         if self._measuring:
-            if frame_number < self._total_frames:
-                r = self._draw_text(f"Processing frame {frame_number} of {self._total_frames}", render_image, (c, r))
+            if frame_number < self._last_frame:
+                if self._first_frame > 0:
+                    r = self._draw_text(
+                        f"Processing frame {frame_number} of {self._first_frame} to {self._last_frame + 1}",
+                        render_image, (c, r))
+                else:
+                    r = self._draw_text(f"Processing frame {frame_number} of {self._last_frame + 1}", render_image,
+                                        (c, r))
             else:
-                r = self._draw_text(f"Processed all {self._total_frames} frames", render_image, (c, r))
+                if self._first_frame > 0:
+                    r = self._draw_text(
+                        f"Processed all {self._last_frame - self._first_frame + 1} frames from {self._first_frame} to {self._last_frame + 1}",
+                        render_image, (c, r))
+                else:
+                    r = self._draw_text(f"Processed all {self._last_frame - self._first_frame + 1} frames",
+                                        render_image, (c, r))
 
         # Render chunk numbers and results
         if self._sent_chunk is not None:

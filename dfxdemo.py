@@ -117,7 +117,7 @@ async def main(args):
     if args.subcommand == "make":
         # ..using a video
         try:
-            vid = VideoReader(args.video_path)
+            vid = VideoReader(args.video_path, args.start_time, args.end_time)
             tracker = DlibTracker()
 
             # Create DFX SDK factory
@@ -212,8 +212,16 @@ async def main(args):
 
             # Coroutine to produce chunks and put then in chunk_queue
             if args.subcommand == "make":
-                renderer = Renderer(_version, os.path.basename(args.video_path), vid.frames_to_process, vid.fps,
-                                    measurement_id, number_chunks, 0.5) if not args.no_render else NullRenderer()
+                renderer = Renderer(
+                    _version,
+                    os.path.basename(args.video_path),
+                    vid.start_frame,
+                    vid.end_frame,
+                    vid.fps,
+                    measurement_id,
+                    number_chunks,
+                    0.5,
+                ) if not args.no_render else NullRenderer()
                 renderer.set_message("Extracting - press Esc to cancel")
                 print("Extraction started")
                 produce_chunks_coro = extract_video(
@@ -519,7 +527,7 @@ def cmdline():
                         "--version",
                         action="version",
                         version=f"%(prog)s {_version} (libdfx v{dfxsdk.__version__})")
-    parser.add_argument("--config_file", default="./config.json")
+    parser.add_argument("-c", "--config_file", help="Path to config file", default="./config.json")
     pp_group = parser.add_mutually_exclusive_group()
     pp_group.add_argument("--json", help="Print as JSON", action="store_true", default=False)
     pp_group.add_argument("--csv", help="Print grids as CSV", action="store_true", default=False)
@@ -561,6 +569,8 @@ def cmdline():
     make_parser = subparser_meas.add_parser("make", help="Make a measurement from a video file")
     make_parser.add_argument("video_path", help="Path to video file", type=str)
     make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.01)
+    make_parser.add_argument("-t", "--start_time", help="Video segment start time (seconds)", type=float, default=None)
+    make_parser.add_argument("-T", "--end_time", help="Video segment end time (seconds)", type=float, default=None)
     make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
     make_parser.add_argument("--debug_study_cfg_file",
                              help="Study config file to use instead of data from API (debugging)",

@@ -13,17 +13,26 @@ class VideoReader:
         self.fps = self._videocap.get(cv2.CAP_PROP_FPS)
         if self.fps <= 0:
             raise RuntimeError(f"Video framerate {self.fps} is invalid. Please override using '--fps' parameter.")
-
-        self.frames_to_process = int(self._videocap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if self.frames_to_process / self.fps > 120:
-            print(
-                f"Video duration {self.frames_to_process / self.fps:.1f}s is longer than 120s, processing first 120s only."
-            )
-            self.frames_to_process = int(self.fps * 120)
-
         self.rotation = self._find_video_rotation(video_path)
         self.mirror = mirror
         self.frame_duration_ns = 1000000000.0 / self.fps
+
+        self.start_frame = 0
+        self.end_frame = int(self._videocap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
+        if start_time is not None:
+            self.start_frame = max(self.start_frame, int(start_time * self.fps))
+        if end_time is not None:
+            self.end_frame = min(self.end_frame, int(end_time * self.fps))
+
+        self.frames_to_process = self.end_frame - self.start_frame
+        if self.frames_to_process / self.fps > 120:
+            print(
+                f"Video segment duration {self.frames_to_process / self.fps:.1f}s is longer than 120s, processing first 120s only."
+            )
+            self.end_frame = int(self.fps * 120)
+            self.frames_to_process = self.end_frame - self.start_frame
+        if self.start_frame > 0:
+            self._videocap.set(cv2.CAP_PROP_POS_FRAMES, self.start_frame)
 
     def _find_video_rotation(self, video_path):
         mi = MediaInfo.parse(video_path)
@@ -41,7 +50,7 @@ class VideoReader:
         frame_number = int(self._videocap.get(cv2.CAP_PROP_POS_FRAMES))
         read, frame = self._videocap.read()
 
-        if read and frame is not None and frame.size != 0 and frame_number < self.frames_to_process:
+        if read and frame is not None and frame.size != 0 and frame_number <= self.end_frame:
             # Mirror frame if necessary
             if self.mirror:
                 frame = cv2.flip(frame, 1)
