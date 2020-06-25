@@ -421,14 +421,15 @@ def logout(config, config_file):
 
 async def retrieve_sdk_config(headers, config, config_file, sdk_id):
     async with aiohttp.ClientSession(headers=headers) as session:
-        status, response = await dfxapi.Studies.retrieve_sdk_config_hash(session, config["selected_study"], sdk_id)
-        if status < 400:
-            if response["MD5Hash"] != config["study_cfg_hash"]:
-                _, response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"], sdk_id)
-                config["study_cfg_hash"] = response["MD5Hash"]
-                config["study_cfg_data"] = response["ConfigFile"]
-                print(f"Retrieved new DFX SDK config data with md5: {config['study_cfg_hash']}")
-                save_config(config, config_file)
+        status, response = await dfxapi.Studies.retrieve_sdk_config_data(session, config["selected_study"], sdk_id,
+                                                                         config["study_cfg_hash"])
+        if status == 304:  # Our hash and data are already correct nothing to do
+            pass
+        elif status == 200:  # Got a new hash and data
+            config["study_cfg_hash"] = response["MD5Hash"]
+            config["study_cfg_data"] = response["ConfigFile"]
+            print(f"Retrieved new DFX SDK config data with md5: {config['study_cfg_hash']}")
+            save_config(config, config_file)
         else:
             raise RuntimeError(
                 f"Could not retrieve DFX SDK config data for Study ID {config['study_cfg_hash']}. Please contact Nuralogix"

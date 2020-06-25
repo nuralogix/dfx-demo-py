@@ -38,6 +38,7 @@ Note: On Ubuntu 18.04, the following commands should work
 ```shell
 sudo apt-get install build-essential git # Compiler and Git
 sudo apt-get install python3.8-dev python3.8-venv # or 3.7
+sudo apt-get install python3-mediainfodll # for pymediainfo
 sudo apt-get install libopenblas-dev liblapack-dev # for Dlib
 ```
 
