@@ -80,12 +80,16 @@ async def main(args):
                 if not study_id or study_id.isspace():
                     print("Please select a study or pass a study id")
                     return
-                _, study = await dfxapi.Studies.retrieve(session, study_id)
+                _, study = await dfxapi.Studies.retrieve(session, study_id, raise_for_status=False)
                 print(json.dumps(study)) if args.json else PP.print_pretty(study, args.csv)
             elif args.subcommand == "list":
                 _, studies = await dfxapi.Studies.list(session)
                 print(json.dumps(studies)) if args.json else PP.print_pretty(studies, args.csv)
             elif args.subcommand == "select":
+                status, response = await dfxapi.Studies.retrieve(session, args.study_id, raise_for_status=False)
+                if status >= 400:
+                    PP.print_pretty(response)
+                    return
                 config["selected_study"] = args.study_id
                 save_config(config, args.config_file)
         return
