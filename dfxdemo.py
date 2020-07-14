@@ -121,7 +121,7 @@ async def main(args):
     if args.subcommand == "make":
         # ..using a video
         try:
-            vid = VideoReader(args.video_path, args.start_time, args.end_time)
+            vid = VideoReader(args.video_path, args.start_time, args.end_time, args.rotation, args.fps)
             tracker = DlibTracker()
 
             # Create DFX SDK factory
@@ -576,6 +576,14 @@ def cmdline():
     make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.01)
     make_parser.add_argument("-t", "--start_time", help="Video segment start time (seconds)", type=float, default=None)
     make_parser.add_argument("-T", "--end_time", help="Video segment end time (seconds)", type=float, default=None)
+    make_parser.add_argument("--fps",
+                             help="Use this framerate instead of detecting from video",
+                             type=float,
+                             default=None)
+    make_parser.add_argument("--rotation",
+                             help="Use this rotation instead of detecting from video (Must be 0, 90, 180 or 270)",
+                             type=float,
+                             default=None)
     make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
     make_parser.add_argument("--debug_study_cfg_file",
                              help="Study config file to use instead of data from API (debugging)",

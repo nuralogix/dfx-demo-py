@@ -5,15 +5,16 @@ from pymediainfo import MediaInfo
 
 
 class VideoReader:
-    def __init__(self, video_path, start_time=None, end_time=None, mirror=False) -> None:
+    def __init__(self, video_path, start_time=None, end_time=None, rotation=None, fps=None, mirror=False) -> None:
         self._videocap = cv2.VideoCapture(video_path)
         if not self._videocap.isOpened():
             raise RuntimeError(f"Could not open {video_path}")
 
-        self.fps = self._videocap.get(cv2.CAP_PROP_FPS)
+        self.fps = self._videocap.get(cv2.CAP_PROP_FPS) if fps is None else fps
         if self.fps <= 0:
             raise RuntimeError(f"Video framerate {self.fps} is invalid. Please override using '--fps' parameter.")
-        self.rotation = self._find_video_rotation(video_path)
+
+        self.rotation = self._find_video_rotation(video_path) if rotation is None else rotation
         self.mirror = mirror
         self.frame_duration_ns = 1000000000.0 / self.fps
 
