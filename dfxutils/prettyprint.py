@@ -26,7 +26,7 @@ class PrettyPrinter():
 
     @staticmethod
     def print_result(measurement_results, csv=False):
-        if "Results" in measurement_results:
+        if "Results" in measurement_results and measurement_results["Results"] is not None:
             grid_results = []
             for signal_id, signal_name in measurement_results["SignalNames"].items():
                 result_data = measurement_results["Results"][signal_id][0]
