@@ -33,14 +33,14 @@ Please ensure you have the following software installed:
   * macOS (untested): [Xcode](https://developer.apple.com/xcode/)
   * Linux: gcc
 
-Note: On Ubuntu 18.04, the following commands should work
+  Note: On Ubuntu 18.04, the following commands should work
 
-```shell
-sudo apt-get install build-essential git # Compiler and Git
-sudo apt-get install python3.8-dev python3.8-venv # or 3.7
-sudo apt-get install python3-mediainfodll # for pymediainfo
-sudo apt-get install libopenblas-dev liblapack-dev # for Dlib
-```
+  ```shell
+  sudo apt-get install build-essential git # Compiler and Git
+  sudo apt-get install python3.8-dev python3.8-venv # or 3.7
+  sudo apt-get install python3-mediainfodll # for pymediainfo
+  sudo apt-get install libopenblas-dev liblapack-dev # for Dlib
+  ```
 
 ## Install `dfxdemo`
 
@@ -146,11 +146,10 @@ python dfxdemo.py measurements list
 
 ## Additional resources
 
-* [DFX Developers Guide](http://docs.deepaffex.ai/developers/index.html) **TODO**
+* [DFX Developers Guide](http://docs.deepaffex.ai/guide/index.html)
 * [DFX SDK](https://deepaffex.ai/developers-sdk)
   * [C++ Docs](http://docs.deepaffex.ai/c/index.html)
   * [Python Docs](http://docs.deepaffex.ai/python/index.html) **TODO**
   * [.NET Docs](http://docs.deepaffex.ai/dotnet/index.html)
 * [DFX Cloud API](https://deepaffex.ai/developers-api)
   * [Apiary](https://dfxapiversion10.docs.apiary.io/)
-* [Description of DFX workflow](https://github.com/nuralogix/dfx-e2e-demo-python/blob/master/dfxexample.md)
