@@ -10,13 +10,13 @@ import string
 
 import aiohttp
 import cv2
+import dfx_apiv2_client as dfxapi
+import libdfx as dfxsdk
 import pkg_resources
 
-import libdfx as dfxsdk
-import dfx_apiv2_client as dfxapi
-
+from dfxutils.app import AppState, MeasurementStep
 from dfxutils.dlib_tracker import DlibTracker
-from dfxutils.opencvhelpers import VideoReader
+from dfxutils.opencvhelpers import CameraReader, VideoReader
 from dfxutils.prettyprint import PrettyPrinter as PP
 from dfxutils.renderer import NullRenderer, Renderer
 from dfxutils.sdkhelpers import DfxSdkHelpers
@@ -44,9 +44,9 @@ async def main(args):
     # Handle "orgs" (Organizations) commands - "register" and "unregister"
     if args.command in ["o", "org", "orgs"]:
         if args.subcommand == "unregister":
-            success = await unregister(config, args.config_file)
+            success = await unregister(config)
         else:
-            success = await register(config, args.config_file, args.license_key)
+            success = await register(config, args.license_key)
 
         if success:
             save_config(config, args.config_file)
@@ -55,9 +55,9 @@ async def main(args):
     # Handle "users" commands - "login" and "logout"
     if args.command in ["u", "user", "users"]:
         if args.subcommand == "logout":
-            success = logout(config, args.config_file)
+            success = logout(config)
         else:
-            success = await login(config, args.config_file, args.email, args.password)
+            success = await login(config, args.email, args.password)
 
         if success:
             save_config(config, args.config_file)
@@ -118,10 +118,18 @@ async def main(args):
         return
 
     # Prepare to make a measurement..
-    if args.subcommand == "make":
-        # ..using a video
+    app = AppState()
+
+    if args.subcommand == "make" or args.subcommand == "make_camera":
+        # ..using a video or camera
+        app.is_camera = args.subcommand == "make_camera"
+        image_src_name = f"Camera {args.camera}" if app.is_camera else os.path.basename(args.video_path)
         try:
-            vid = VideoReader(args.video_path, args.start_time, args.end_time, args.rotation, args.fps)
+            # Open the camera or video
+            imreader = CameraReader(args.camera, mirror=True) if app.is_camera else VideoReader(
+                args.video_path, args.start_time, args.end_time, rotation=args.rotation, fps=args.fps)
+
+            # Create a face tracker
             tracker = DlibTracker()
 
             # Create DFX SDK factory
@@ -153,18 +161,33 @@ async def main(args):
 
         print("Created DFX Collector:")
         chunk_duration_s = float(args.chunk_duration_s)
-        frames_per_chunk = math.ceil(chunk_duration_s * vid.fps)
-        number_chunks = math.ceil(vid.frames_to_process / frames_per_chunk)
+        frames_per_chunk = math.ceil(chunk_duration_s * imreader.fps)
+        if app.is_camera:
+            app.number_chunks = math.ceil(args.measurement_duration_s / args.chunk_duration_s)
+            app.end_frame = math.ceil(args.measurement_duration_s * imreader.fps)
+        else:
+            app.number_chunks = math.ceil(imreader.frames_to_process / frames_per_chunk)
+            app.begin_frame = imreader.start_frame
+            app.end_frame = imreader.stop_frame
 
         # Set collector config
-        collector.setTargetFPS(vid.fps)
+        collector.setTargetFPS(imreader.fps)
         collector.setChunkDurationSeconds(chunk_duration_s)
-        collector.setNumberChunks(number_chunks)
+        collector.setNumberChunks(app.number_chunks)
         print(f"    mode: {factory.getMode()}")
         print(f"    number chunks: {collector.getNumberChunks()}")
         print(f"    chunk duration: {collector.getChunkDurationSeconds()}s")
         for constraint in collector.getEnabledConstraints():
             print(f"    enabled constraint: {constraint}")
+
+        # Set the collector constraints config
+        if app.is_camera:
+            app.constraints_cfg = DfxSdkHelpers.ConstraintsConfig(collector.getConstraintsConfig("json"))
+            app.constraints_cfg.minimumFps = 10
+            collector.setConstraintsConfig("json", str(app.constraints_cfg))
+
+        # If it's a video file, we immediately start extraction
+        app.step = MeasurementStep.USER_STARTED if not app.is_camera else MeasurementStep.NOT_READY
 
     elif args.subcommand == "debug_make_from_chunks":
         # .. or using previously saved chunks
@@ -177,13 +200,13 @@ async def main(args):
             return
         with open(prop_files[0], 'r') as pr:
             props = json.load(pr)
-            number_chunks = props["number_chunks"]
+            app.number_chunks = props["number_chunks"]
             duration_pr = props["duration_s"]
-        if number_chunks != number_files:
-            print(f"Number of chunks in properties.json {number_chunks} != Number of payload files {number_files}")
+        if app.number_chunks != number_files:
+            print(f"Number of chunks in properties.json {app.number_chunks} != Number of payload files {number_files}")
             return
-        if duration_pr * number_chunks > 120:
-            print(f"Total payload duration {duration_pr * number_chunks} seconds is more than 120 seconds")
+        if duration_pr * app.number_chunks > 120:
+            print(f"Total payload duration {duration_pr * app.number_chunks} seconds is more than 120 seconds")
             return
 
         # Create DFX SDK factory (just so we can have a collector for decoding results)
@@ -191,6 +214,8 @@ async def main(args):
         print("Created DFX Factory:", factory.getVersion())
         collector = factory.createCollector()
         print("Created DFX Collector for results decoding only")
+
+        app.step = MeasurementStep.USER_STARTED
     else:
         print("Unknown subcommand to 'meas'. This should never happen")
         return
@@ -199,42 +224,41 @@ async def main(args):
     async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
         # Create a measurement on the API and get the measurement ID
         _, response = await dfxapi.Measurements.create(session, config["selected_study"])
-        measurement_id = response["ID"]
-        print(f"Created measurement {measurement_id}")
+        app.measurement_id = response["ID"]
+        print(f"Created measurement {app.measurement_id}")
 
         # Use the session to connect to the WebSocket
         async with session.ws_connect(dfxapi.Settings.ws_url) as ws:
             # Subscribe to results
             results_request_id = generate_reqid()
-            await dfxapi.Measurements.ws_subscribe_to_results(ws, results_request_id, measurement_id)
+            await dfxapi.Measurements.ws_subscribe_to_results(ws, results_request_id, app.measurement_id)
 
             # Queue to pass chunks between coroutines
-            chunk_queue = asyncio.Queue(number_chunks)
+            chunk_queue = asyncio.Queue(app.number_chunks)
 
             # When we receive `results_expected` results, we close the WebSocket in `receive_results`
-            results_expected = number_chunks
+            results_expected = app.number_chunks
 
             # Coroutine to produce chunks and put then in chunk_queue
-            if args.subcommand == "make":
+            if args.subcommand == "make" or args.subcommand == "make_camera":
                 renderer = Renderer(
                     _version,
-                    os.path.basename(args.video_path),
-                    vid.start_frame,
-                    vid.end_frame,
-                    vid.fps,
-                    measurement_id,
-                    number_chunks,
-                    0.5,
-                ) if not args.no_render else NullRenderer()
-                renderer.set_message("Extracting - press Esc to cancel")
-                print("Extraction started")
-                produce_chunks_coro = extract_video(
+                    image_src_name,
+                    imreader.fps,
+                    app,
+                    0.5 if imreader.height >= 720 else 1.0,
+                ) if app.is_camera or not args.no_render else NullRenderer()
+                if not app.is_camera:
+                    print("Extraction started")
+                else:
+                    print("Waiting to start")
+                produce_chunks_coro = extract_from_imgs(
                     chunk_queue,  # Chunks will be put into this queue
-                    vid,  # Video reader
+                    imreader,  # Image reader
                     tracker,  # Face tracker
                     collector,  # DFX SDK collector needed to create chunks
-                    renderer  # Rendering
-                )
+                    renderer,  # Rendering
+                    app)  # App
             else:  # args.subcommand == "debug_make_from_chunks":
                 renderer = NullRenderer()
                 produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
@@ -251,7 +275,7 @@ async def main(args):
                     action = determine_action(chunk.chunk_number, chunk.number_chunks)
 
                     # Add data
-                    await dfxapi.Measurements.ws_add_data(ws, generate_reqid(), measurement_id, chunk.chunk_number,
+                    await dfxapi.Measurements.ws_add_data(ws, generate_reqid(), app.measurement_id, chunk.chunk_number,
                                                           action, chunk.start_time_s, chunk.end_time_s,
                                                           chunk.duration_s, chunk.metadata, chunk.payload_data)
                     print(f"Sent chunk {chunk.chunk_number}")
@@ -263,7 +287,8 @@ async def main(args):
                         print(f"Saved chunk {chunk.chunk_number} in '{args.debug_save_chunks_folder}'")
 
                     chunk_queue.task_done()
-                renderer.set_message("Waiting for results - Press Esc to cancel")
+
+                app.step = MeasurementStep.WAITING_RESULTS
                 print("Extraction complete, waiting for results")
 
             # Coroutine to receive responses using the Websocket
@@ -280,7 +305,8 @@ async def main(args):
                     if num_results_received == results_expected:
                         await ws.close()
                         break
-                renderer.set_message("Measurement complete - press Esc to exit")
+
+                app.step = MeasurementStep.COMPLETED
                 print("Measurement complete")
 
             # Coroutine for rendering
@@ -304,11 +330,11 @@ async def main(args):
                     e = d.exception()
                     if type(e) != asyncio.CancelledError:
                         print(e)
-                print(f"Measurement {measurement_id} failed")
+                print(f"Measurement {app.measurement_id} failed")
             else:
-                config["last_measurement"] = measurement_id
+                config["last_measurement"] = app.measurement_id
                 save_config(config, args.config_file)
-                print(f"Measurement {measurement_id} completed")
+                print(f"Measurement {app.measurement_id} completed")
                 print(f"Use 'python {os.path.basename(__file__)} measure get' to get comprehensive results")
 
 
@@ -334,6 +360,10 @@ def load_config(config_file):
     dfxapi.Settings.role_id = config["role_id"]
     dfxapi.Settings.role_id = config["role_id"]
     dfxapi.Settings.user_token = config["user_token"]
+    if "rest_url" in config and config["rest_url"]:
+        dfxapi.Settings.rest_url = config["rest_url"]
+    if "ws_url" in config and config["ws_url"]:
+        dfxapi.Settings.ws_url = config["ws_url"]
 
     return config
 
@@ -357,7 +387,7 @@ def determine_action(chunk_number, number_chunks):
     return action
 
 
-async def register(config, config_file, license_key):
+async def register(config, license_key):
     if dfxapi.Settings.device_token:
         print("Already registered")
         return False
@@ -377,7 +407,7 @@ async def register(config, config_file, license_key):
             return False
 
 
-async def unregister(config, config_file):
+async def unregister(config):
     if not dfxapi.Settings.device_token:
         print("Not registered")
         return False
@@ -395,7 +425,7 @@ async def unregister(config, config_file):
             print(f"Unregister failed {status}: {body}")
 
 
-async def login(config, config_file, email, password):
+async def login(config, email, password):
     if dfxapi.Settings.user_token:
         print("Already logged in")
         return False
@@ -416,7 +446,7 @@ async def login(config, config_file, email, password):
             return False
 
 
-def logout(config, config_file):
+def logout(config):
     config["user_token"] = ""
     config["user_id"] = ""
     print("Logout successful")
@@ -435,20 +465,17 @@ async def retrieve_sdk_config(headers, config, config_file, sdk_id):
             print(f"Retrieved new DFX SDK config data with md5: {config['study_cfg_hash']}")
             save_config(config, config_file)
         else:
-            raise RuntimeError(
-                f"Could not retrieve DFX SDK config data for Study ID {config['study_cfg_hash']}. Please contact Nuralogix"
-            )
+            raise RuntimeError(f"Could not retrieve DFX SDK config data for Study ID {config['study_cfg_hash']}. "
+                               "Please contact Nuralogix")
 
         return base64.standard_b64decode(config["study_cfg_data"])
 
 
-async def extract_video(chunk_queue, vid, tracker, collector, renderer):
-    # Start the DFX SDK collection
-    collector.startCollection()
-
-    # Read frames from the video, track faces and extract using collector
+async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer, app):
+    # Read frames from the image source, track faces and extract using collector
     while True:
-        read, image, frame_number = await vid.read_next_frame()
+        # Grab a frame
+        read, image, frame_number, frame_timestamp_ns = await imreader.read_next_frame()
         if not read or image is None:
             # Video ended, so grab what should be the last, possibly truncated chunk
             collector.forceComplete()
@@ -458,35 +485,68 @@ async def extract_video(chunk_queue, vid, tracker, collector, renderer):
                 await chunk_queue.put(chunk)
                 break
 
+        # Start the DFX SDK collection if we received a start command
+        if app.step == MeasurementStep.USER_STARTED:
+            collector.startCollection()
+            app.step = MeasurementStep.MEASURING
+            if app.is_camera:
+                app.begin_frame = frame_number
+                app.end_frame = frame_number + app.end_frame
+
         # Track faces
         tracked_faces = tracker.trackFaces(image)
 
         # Create a DFX VideoFrame, then a DFX Frame from the DFX VideoFrame and add DFX faces to it
-        dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_number * vid.frame_duration_ns,
+        dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_timestamp_ns,
                                             dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR)
         dfx_frame = collector.createFrame(dfx_video_frame)
         if len(tracked_faces) > 0:
-            tracked_face = next(iter(tracked_faces.values()))  # We only care about the first face
+            tracked_face = next(iter(tracked_faces.values()))  # We only care about the first face in this demo
             dfx_face = DfxSdkHelpers.dfx_face_from_json(collector, tracked_face)
             dfx_frame.addFace(dfx_face)
 
-        # Do the extraction
-        collector.defineRegions(dfx_frame)
-        result = collector.extractChannels(dfx_frame)
+        # For cameras, check constraints and provide users actionable feedback
+        if app.is_camera:
+            c_result, c_details = collector.checkConstraints(dfx_frame)
 
-        # Grab a chunk and check if we are finished
-        if result == dfxsdk.CollectorState.CHUNKREADY or result == dfxsdk.CollectorState.COMPLETED:
-            chunk_data = collector.getChunkData()
-            if chunk_data is not None:
-                chunk = chunk_data.getChunkPayload()
-                await chunk_queue.put(chunk)
-            if result == dfxsdk.CollectorState.COMPLETED:
-                break
+            # Change renderer state
+            renderer.set_constraints_feedback(DfxSdkHelpers.user_feedback_from_constraints(c_details))
 
-        await renderer.put_nowait((image, (dfx_frame, frame_number)))
+            # Change the app step
+            if app.step in [MeasurementStep.NOT_READY, MeasurementStep.READY]:
+                if c_result == dfxsdk.ConstraintResult.GOOD:
+                    app.step = MeasurementStep.READY
+                else:
+                    app.step = MeasurementStep.NOT_READY
+            elif app.step == MeasurementStep.MEASURING:
+                if c_result == dfxsdk.ConstraintResult.ERROR:
+                    app.step = MeasurementStep.FAILED
+                    reasons = DfxSdkHelpers.failure_causes_from_constraints(c_details)
+                    print(reasons)
+
+        # Extract bloodflow if the measurement has started
+        if app.step == MeasurementStep.MEASURING:
+            collector.defineRegions(dfx_frame)
+            result = collector.extractChannels(dfx_frame)
+
+            # Grab a chunk and check if we are finished
+            if result == dfxsdk.CollectorState.CHUNKREADY or result == dfxsdk.CollectorState.COMPLETED:
+                chunk_data = collector.getChunkData()
+                if chunk_data is not None:
+                    chunk = chunk_data.getChunkPayload()
+                    await chunk_queue.put(chunk)
+                if result == dfxsdk.CollectorState.COMPLETED:
+                    if app.is_camera:
+                        imreader.stop()
+                    break
+
+        await renderer.put_nowait((image, (dfx_frame, frame_number, frame_timestamp_ns)))
 
     # Stop the tracker
     tracker.stop()
+
+    # Close the camera
+    imreader.close()
 
     # Signal to send_chunks that we are done
     await chunk_queue.put(None)
@@ -593,6 +653,24 @@ def cmdline():
                              help="Save SDK chunks to folder (debugging)",
                              type=str,
                              default=None)
+
+    camera_parser = subparser_meas.add_parser("make_camera", help="Make a measurement from a camera")
+    camera_parser.add_argument("--camera", help="Camera ID", type=int, default=0)
+    camera_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.01)
+    camera_parser.add_argument("-md",
+                               "--measurement_duration_s",
+                               help="Measurement duration (seconds)",
+                               type=float,
+                               default=30)
+    camera_parser.add_argument("--debug_study_cfg_file",
+                               help="Study config file to use instead of data from API (debugging)",
+                               type=str,
+                               default=None)
+    camera_parser.add_argument("--debug_save_chunks_folder",
+                               help="Save SDK chunks to folder (debugging)",
+                               type=str,
+                               default=None)
+
     mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
                                              help="Make a measurement from saved SDK chunks (debugging)")
     mk_ch_parser.add_argument("debug_chunks_folder", help="Folder containing SDK chunks", type=str)

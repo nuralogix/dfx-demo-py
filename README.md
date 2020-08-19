@@ -1,16 +1,16 @@
 # `dfxdemo`
 
 `dfxdemo` is a simple Python-based demo that demonstrates how to use the
-DeepAffex SDK and DeepAffex Cloud API.
+DeepAffex™ Extraction SDK and DeepAffex™ Cloud API.
 
-The demo can extract facial blood-flow from a video file, send it to the
-DeepAffex Cloud for processing and display the results. (This process is called
-'making a measurement'.) It can also be used to display historical results or
-to view study details.
+The demo can extract facial blood-flow from a video file or from a webcam, send
+it to the DeepAffex™ Cloud for processing and display the results. (This
+process is called 'making a measurement'.) It can also be used to display
+historical results or to view study details.
 
-## Register for an DeepAffex Cloud API license
+## Register for an DeepAffex™ Cloud API license
 
-If you haven't already done so, the first step is to register for a DeepAffex
+If you haven't already done so, the first step is to register for a DeepAffex™
 developer account and request a cloud API license key. You can do this by
 visiting the [DFX Dashboard](https://dashboard.deepaffex.ai/) and selecting the
 Sign Up link at the bottom.
@@ -81,7 +81,7 @@ is organized. All commands and subcommands have a `--help` argument.
 
 ### Register your license
 
-Register your organization license on the DeepAffex Cloud to obtain a *device
+Register your organization license on the DeepAffex™ Cloud to obtain a *device
 token*. This is generally the first thing you have to do (unless you don't want
 to make a measurement.)
 
@@ -109,7 +109,7 @@ python dfxdemo.py user login <email> <password>
 List the available DFX Studies and retrieve the details of the one you want to
 use.
 
-Note: The DeepAffex Cloud organizes around the concept of Studies - a DFX
+Note: The DeepAffex™ Cloud organizes around the concept of Studies - a DFX
 Study is a collection of biosignals of interest that are computed in one
 measurement.
 
@@ -126,11 +126,19 @@ python dfxdemo.py study select <study_id>
 
 ### Measurements
 
-Make a measurement using the selected study
+Make a measurement from a video using the selected study
 
    ```shell
    python dfxdemo.py measure make /path/to/video_file
    ```
+
+or
+
+Make a measurment from a webcam using the selected study
+
+  ```shell
+  python dfxdemo.py measure make_camera
+  ```
 
 Retrieve detailed results of the last measurement
 
@@ -146,10 +154,10 @@ python dfxdemo.py measurements list
 
 ## Additional resources
 
-* [DFX Developers Guide](http://docs.deepaffex.ai/guide/index.html)
-* [DFX SDK](https://deepaffex.ai/developers-sdk)
+* [Developers Guide](http://docs.deepaffex.ai/guide/index.html)
+* [SDK](https://deepaffex.ai/developers-sdk)
   * [C++ Docs](http://docs.deepaffex.ai/c/index.html)
   * [Python Docs](http://docs.deepaffex.ai/python/index.html) **TODO**
   * [.NET Docs](http://docs.deepaffex.ai/dotnet/index.html)
-* [DFX Cloud API](https://deepaffex.ai/developers-api)
+* [Cloud API](https://deepaffex.ai/developers-api)
   * [Apiary](https://dfxapiversion10.docs.apiary.io/)

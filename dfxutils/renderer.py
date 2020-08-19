@@ -1,27 +1,51 @@
 import asyncio
 import datetime
 
+from collections import deque
+
 import cv2
 import numpy as np
 
+from .app import MeasurementStep
+
+_message_action = {
+    MeasurementStep.NOT_READY: "",
+    MeasurementStep.READY: "Press 's' to start",
+    MeasurementStep.USER_STARTED: "",
+    MeasurementStep.MEASURING: "Press Esc to cancel",
+    MeasurementStep.WAITING_RESULTS: "Press Esc to cancel",
+    MeasurementStep.COMPLETED: "Press Esc to exit",
+    MeasurementStep.USER_CANCELLED: "",
+    MeasurementStep.FAILED: "Press Esc to exit"
+}
+
+_message_state = {
+    MeasurementStep.NOT_READY: "Not ready to measure",
+    MeasurementStep.READY: "Ready to measure",
+    MeasurementStep.USER_STARTED: "Starting",
+    MeasurementStep.MEASURING: "",
+    MeasurementStep.WAITING_RESULTS: "Waiting for results",
+    MeasurementStep.COMPLETED: "Measurement completed successfully",
+    MeasurementStep.USER_CANCELLED: "Measurement cancelled by user",
+    MeasurementStep.FAILED: "Measurement failed"
+}
+
 
 class Renderer():
-    def __init__(self, version, image_src_name, first_frame, last_frame, fps, measurement_id, total_chunks, sf=1.0):
+    def __init__(self, version, image_src_name, fps, app, sf=1.0):
         self._render_queue = asyncio.Queue(1)
         self._version = version
         self._image_src_name = image_src_name
-        self._first_frame = first_frame
-        self._last_frame = last_frame
         self._fps = fps
-        self._measurement_id = measurement_id
-        self._total_chunks = total_chunks
-        self._measuring = True
-        self._message = ""
+        self._app = app
+        self._feedback = ""
         self._results = {}
         self._sf = sf if sf > 0 else 1.0
         self._rendering_last = False
         self._recv_chunk = None
         self._sent_chunk = None
+        self._timestamps_ns = deque(maxlen=11)
+        self._last_frame_number = None
 
     async def render(self):
         render_image, meta = None, None
@@ -35,9 +59,14 @@ class Renderer():
                 self._draw_on_image(render_image_copy, meta)
                 cv2.imshow(f"dfxdemo {self._version}", render_image_copy)
                 k = cv2.waitKey(1)
-                if k == 'q' or k == 27:
+                if k in [ord('q'), 27]:
                     cancelled = True
+                    self._app.step = MeasurementStep.USER_CANCELLED
                     break
+                if self._app.step == MeasurementStep.READY and k in [ord('s'), ord(' ')]:
+                    self._app.step = MeasurementStep.USER_STARTED
+                elif self._app.step == MeasurementStep.FAILED and k in [ord('r')]:
+                    self._app.step = MeasurementStep.NOT_READY
             except asyncio.QueueEmpty:
                 pass
             finally:
@@ -54,10 +83,13 @@ class Renderer():
             self._draw_on_image(render_image_copy, meta)
             cv2.imshow(f"dfxdemo {self._version}", render_image_copy)
             k = cv2.waitKey(1)
-            if k == 'q' or k == 27:
+            if k in [ord('q'), 27]:
+                if self._app.step == MeasurementStep.WAITING_RESULTS:
+                    self._app.step = MeasurementStep.USER_CANCELLED
+                    cancelled = True
                 break
 
-        return False
+        return cancelled
 
     async def put_nowait(self, render_info):
         try:
@@ -76,8 +108,8 @@ class Renderer():
     def keep_render_last_frame(self):
         self._rendering_last = True
 
-    def set_message(self, message):
-        self._message = message
+    def set_constraints_feedback(self, feedback):
+        self._feedback = feedback
 
     def set_results(self, results):
         recv_chunk = int(results["chunk_number"])
@@ -90,7 +122,18 @@ class Renderer():
         self._sent_chunk = int(sent_number)
 
     def _draw_on_image(self, render_image, image_meta):
-        dfxframe, frame_number = image_meta
+        dfxframe, frame_number, frame_timestamp_ns = image_meta
+        # Render the target_rect
+        if self._app.constraints_cfg is not None:
+            w = render_image.shape[1] * self._app.constraints_cfg.boxWidth_pct / 100
+            h = render_image.shape[0] * self._app.constraints_cfg.boxHeight_pct / 100
+            xc = render_image.shape[1] * self._app.constraints_cfg.boxCenterX_pct / 100
+            yc = render_image.shape[0] * self._app.constraints_cfg.boxCenterY_pct / 100
+            cv2.rectangle(render_image, (int(xc - w / 2), int(yc - h / 2)), (int(xc + w / 2), int(yc + h / 2)),
+                          color=(255, 0, 0),
+                          thickness=1,
+                          lineType=cv2.LINE_AA)
+
         # Render the face polygons
         for faceID in dfxframe.getFaceIdentifiers():
             for regionID in dfxframe.getRegionNames(faceID):
@@ -101,50 +144,70 @@ class Renderer():
                                   color=(255, 255, 0),
                                   thickness=1,
                                   lineType=cv2.LINE_AA)
-        # Render filename and framerate
-        c = 2
-        r = 15
-        msg = f"{self._image_src_name} ({self._fps:.2f} fps)"
-        r = self._draw_text(msg, render_image, (c, r))
-
-        # Render the message
-        if self._message:
-            r = self._draw_text(self._message, render_image, (c, r), fg=(255, 0, 0))
-
-        r += 10
-        # Render progress
-        if self._measuring:
-            if frame_number < self._last_frame:
-                if self._first_frame > 0:
-                    r = self._draw_text(
-                        f"Processing frame {frame_number} of {self._first_frame} to {self._last_frame + 1}",
-                        render_image, (c, r))
-                else:
-                    r = self._draw_text(f"Processing frame {frame_number} of {self._last_frame + 1}", render_image,
-                                        (c, r))
-            else:
-                if self._first_frame > 0:
-                    r = self._draw_text(
-                        f"Processed all {self._last_frame - self._first_frame + 1} frames from {self._first_frame} to {self._last_frame + 1}",
-                        render_image, (c, r))
-                else:
-                    r = self._draw_text(f"Processed all {self._last_frame - self._first_frame + 1} frames",
-                                        render_image, (c, r))
-
-        # Render chunk numbers and results
-        if self._sent_chunk is not None:
-            r = self._draw_text(f"Sent chunk: {self._sent_chunk + 1} of {self._total_chunks}", render_image, (c, r))
-        if self._results:
-            r = self._draw_text(f"Received result: {self._recv_chunk + 1} of {self._total_chunks}", render_image,
-                                (c, r))
-            for k, v in self._results.items():
-                r = self._draw_text(f"{k}: {v}", render_image, (c + 10, r), fs=0.8)
 
         # Render the current time (so user knows things aren't frozen)
         now = datetime.datetime.now()
         self._draw_text(f"{now.strftime('%X')}",
                         render_image, (render_image.shape[1] - 70, 15),
                         fg=(0, 128, 0) if now.second % 2 == 0 else (0, 0, 0))
+
+        # Render filename, framerate of last 10 frames and expected framerate
+        c = 2
+        r = 15
+        if not self._app.is_camera:
+            msg = f"{self._image_src_name}: {self._fps:.2f} fps"
+        else:
+            if not self._rendering_last:
+                self._timestamps_ns.append(frame_timestamp_ns)
+            if len(self._timestamps_ns) >= 2:
+                deltas = [self._timestamps_ns[i + 1] - self._timestamps_ns[i] for i in range(len(self._timestamps_ns) - 1)]
+                avg_delta = sum(deltas) / len(deltas)
+                fps_now = 1000_000_000.0 / avg_delta
+            else:
+                fps_now = self._fps
+            msg = f"{self._image_src_name}: {self._fps:.2f} fps | {fps_now:.2f} fps"
+        r = self._draw_text(msg, render_image, (c, r))
+
+        # Render the message
+        message_action = _message_action[self._app.step]
+        if message_action:
+            r = self._draw_text(message_action, render_image, (c, r), fg=(255, 0, 0))
+
+        # Render progress
+        if self._app.step == MeasurementStep.MEASURING:
+            if self._app.begin_frame > 0:
+                r = self._draw_text(
+                    f"Extracting frame {frame_number} of {self._app.begin_frame} to {self._app.end_frame + 1}",
+                    render_image, (c, r))
+            else:
+                r = self._draw_text(f"Extracting frame {frame_number} of {self._app.end_frame + 1}", render_image,
+                                    (c, r))
+        elif self._app.step == MeasurementStep.WAITING_RESULTS:
+            if self._app.begin_frame > 0:
+                r = self._draw_text(
+                    f"Extracted all {self._app.end_frame - self._app.begin_frame + 1} frames from "
+                    f"{self._app.begin_frame} to {self._app.end_frame + 1}", render_image, (c, r))
+            else:
+                r = self._draw_text(f"Extracted all {self._app.end_frame - self._app.begin_frame + 1} frames",
+                                    render_image, (c, r))
+            dots = "..." if now.second % 2 == 0 else ""
+            r = self._draw_text(_message_state[self._app.step] + dots, render_image, (c, r))
+        else:
+            r = self._draw_text(_message_state[self._app.step], render_image, (c, r))
+
+        # Render the constraints feedback
+        if self._feedback:
+            r = self._draw_text(self._feedback, render_image, (c, r), fg=(0, 0, 255))
+
+        # Render chunk numbers and results
+        if self._sent_chunk is not None:
+            r = self._draw_text(f"Sent chunk: {self._sent_chunk + 1} of {self._app.number_chunks}", render_image,
+                                (c, r))
+        if self._results:
+            r = self._draw_text(f"Received result: {self._recv_chunk + 1} of {self._app.number_chunks}", render_image,
+                                (c, r))
+            for k, v in self._results.items():
+                r = self._draw_text(f"{k}: {v}", render_image, (c + 10, r), fs=0.8)
 
     def _draw_text(self, msg, render_image, origin, fs=None, fg=None, bg=None):
         FONT = cv2.FONT_HERSHEY_SIMPLEX
@@ -175,7 +238,7 @@ class NullRenderer():
     def keep_render_last_frame(self):
         pass
 
-    def set_message(self, _):
+    def set_constraints_feedback(self, _):
         pass
 
     def set_results(self, _):

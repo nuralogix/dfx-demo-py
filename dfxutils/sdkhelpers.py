@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Dict
 
 import libdfx as dfxsdk
 
@@ -60,3 +61,48 @@ class DfxSdkHelpers:
             dict_result[k] = str(sum(value) / len(value)) if len(value) > 0 else None
 
         return dict_result
+
+    _constraints_messages = {
+        "FaceNone": ("no face detected", "Move face into target region"),
+        "FaceOffTarget": ("not in target region", "Move face into target region"),
+        "FaceDirection": ("not looking at camera", "Look straight at the camera"),
+        "FaceFar": ("too far from camera", "Move closer to the camera"),
+        "FaceMovement": ("moving too much", "Hold still"),
+        "ImageBright": ("image too bright", "Image too bright - try a darker room"),
+        "ImageDark": ("image too dark", "Image too dark - try a brighter room"),
+        "ImageQuality": ("bad image quality", "Improve image quality - try alternate webcam"),
+        "ImageBackLit": ("backlit face", "Remove backlight behind face"),
+        "LowFps": ("framerate too low", "Framerate is too low - try alternate webcam or a brighter room"),
+    }
+
+    @staticmethod
+    def user_feedback_from_constraints(constraint_violation_details: Dict[str, dfxsdk.ConstraintResult]):
+        for k, v in constraint_violation_details.items():
+            if v == dfxsdk.ConstraintResult.WARN or v == dfxsdk.ConstraintResult.ERROR:
+                if k in DfxSdkHelpers._constraints_messages:
+                    return DfxSdkHelpers._constraints_messages[k][1]
+                else:
+                    return k
+
+        return ""
+
+    @staticmethod
+    def failure_causes_from_constraints(constraint_violation_details: Dict[str, dfxsdk.ConstraintResult]):
+        causes = []
+        for k, v in constraint_violation_details.items():
+            if v == dfxsdk.ConstraintResult.ERROR:
+                if k in DfxSdkHelpers._constraints_messages:
+                    causes.append(DfxSdkHelpers._constraints_messages[k][0])
+                else:
+                    causes.append(k)
+        if len(causes) > 0:
+            return "Failed because " + ", ".join(causes)
+        else:
+            return "Failed because of unknown reasons!"
+
+    class ConstraintsConfig():
+        def __init__(self, cfg_str: str) -> None:
+            self.__dict__.update(json.loads(cfg_str))
+
+        def __str__(self) -> str:
+            return json.dumps(self.__dict__)
