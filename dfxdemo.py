@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import base64
+import copy
 import glob
 import json
 import math
@@ -283,7 +284,7 @@ async def main(args):
 
                     # Save chunk (for debugging purposes)
                     if "debug_save_chunks_folder" in args and args.debug_save_chunks_folder:
-                        DfxSdkHelpers.save_chunk(chunk, args.debug_save_chunks_folder)
+                        DfxSdkHelpers.save_chunk(copy.copy(chunk), args.debug_save_chunks_folder)
                         print(f"Saved chunk {chunk.chunk_number} in '{args.debug_save_chunks_folder}'")
 
                     chunk_queue.task_done()
