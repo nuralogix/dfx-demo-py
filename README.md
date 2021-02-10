@@ -57,7 +57,8 @@ upgrade `pip`
   cd dfx-demo-py
   python3 -m venv venv
   source venv/bin/activate # on Windows: venv\Scripts\activate
-  python -m pip install --upgrade pip setuptools wheel
+  python -m pip install --upgrade pip setuptools
+  python -m pip install --upgrade wheel cmake
   ```
 
 Download the [Python wheel for the DFX SDK](https://deepaffex.ai/developers-sdk)
