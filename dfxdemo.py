@@ -321,9 +321,14 @@ async def main(args):
                     tracker.stop()
                     raise ValueError("Measurement was cancelled by user.")
 
-            # Start the coroutines and wait till they finish
-            coroutines = [produce_chunks_coro, send_chunks(), receive_results(), render()]
-            done, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_EXCEPTION)
+            # Wrap the coroutines in tasks, start them and wait till they finish
+            tasks = [
+                asyncio.create_task(produce_chunks_coro),
+                asyncio.create_task(send_chunks()),
+                asyncio.create_task(receive_results()),
+                asyncio.create_task(render())
+            ]
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
             for p in pending:  # If there were any pending coroutines, cancel them here...
                 p.cancel()
             if len(pending) > 0:  # If we had pending coroutines, it means something went wrong in the 'done' ones
@@ -466,7 +471,7 @@ async def retrieve_sdk_config(headers, config, config_file, sdk_id):
             print(f"Retrieved new DFX SDK config data with md5: {config['study_cfg_hash']}")
             save_config(config, config_file)
         else:
-            raise RuntimeError(f"Could not retrieve DFX SDK config data for Study ID {config['study_cfg_hash']}. "
+            raise RuntimeError(f"Could not retrieve DFX SDK config data for Study ID {config['selected_study']}. "
                                "Please contact Nuralogix")
 
         return base64.standard_b64decode(config["study_cfg_data"])
