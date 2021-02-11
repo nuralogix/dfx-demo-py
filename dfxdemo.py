@@ -137,9 +137,24 @@ async def main(args):
     assert args.command in ["m", "measure", "measurements"] and "make" in args.subcommand
 
     # Verify preconditions
+    # 1. Make sure a study is selected
     if not config["selected_study"]:
         print("Please select a study first using 'study select'")
         return
+
+    # 2. Check if the profile_id if selected, actually exists
+    if args.profile_id != "":
+        try:
+            async with aiohttp.ClientSession(headers=headers, raise_for_status=False) as session:
+                status, body = await dfxapi.Profiles.retrieve(session, args.profile_id)
+                if status >= 400:
+                    print(f"Could not verify that profile ${args.profile_id} exists")
+                    print(body)
+                    return
+        except Exception as e:  # This try catch code path can be removed once the bug on the API is fixed
+            print(f"Could not verify that profile ${args.profile_id} exists")
+            print(e)
+            return
 
     # Prepare to make a measurement..
     app = AppState()
