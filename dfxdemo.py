@@ -73,6 +73,26 @@ async def main(args):
     token = dfxapi.Settings.user_token if dfxapi.Settings.user_token else dfxapi.Settings.device_token
     headers = {"Authorization": f"Bearer {token}"}
 
+    # Handle "profiles" commands - "create", "update", "remove", "get" and "list"
+    if args.command in ["p", "profile", "profiles"]:
+        async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
+            if args.subcommand == "create":
+                _, profile_id = await dfxapi.Profiles.create(session, args.name, args.email)
+                print(json.dumps(profile_id)) if args.json else PP.print_pretty(profile_id, args.csv)
+            elif args.subcommand == "update":
+                _, body = await dfxapi.Profiles.update(session, args.profile_id, args.name, args.email, args.status)
+                print(json.dumps(body)) if args.json else PP.print_pretty(body, args.csv)
+            elif args.subcommand == "remove":
+                _, body = await dfxapi.Profiles.delete(session, args.profile_id)
+                print(json.dumps(body)) if args.json else PP.print_pretty(body, args.csv)
+            elif args.subcommand == "get":
+                _, profile = await dfxapi.Profiles.retrieve(session, args.profile_id)
+                print(json.dumps(profile)) if args.json else PP.print_pretty(profile, args.csv)
+            elif args.subcommand == "list":
+                _, profile_list = await dfxapi.Profiles.list(session)
+                print(json.dumps(profile_list)) if args.json else PP.print_pretty(profile_list, args.csv)
+        return
+
     # Handle "studies" commands - "get", "list" and "select"
     if args.command in ["s", "study", "studies"]:
         async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
@@ -622,6 +642,22 @@ def cmdline():
     login_parser.add_argument("email", help="Email address")
     login_parser.add_argument("password", help="Password")
     logout_parser = subparser_users.add_parser("logout", help="User logout")
+
+    subparser_profiles = subparser_top.add_parser("profiles", aliases=["p", "profile"],
+                                                  help="Profiles").add_subparsers(dest="subcommand", required=True)
+    profile_create_parser = subparser_profiles.add_parser("create", help="Create profile")
+    profile_create_parser.add_argument("name", help="Name (unique)", type=str)
+    profile_create_parser.add_argument("--email", help="Email", type=str, default="no_email_provided")
+    profile_update_parser = subparser_profiles.add_parser("update", help="Update profile")
+    profile_update_parser.add_argument("profile_id", help="Profile ID to update", type=str)
+    profile_update_parser.add_argument("name", help="New Name", type=str, default="")
+    profile_update_parser.add_argument("email", help="New Email", type=str, default="")
+    profile_update_parser.add_argument("status", help="New Status", type=str, default="")
+    profile_remove_parser = subparser_profiles.add_parser("remove", help="Remove profile")
+    profile_remove_parser.add_argument("profile_id", help="Profile ID to remove", type=str)
+    profile_get_parser = subparser_profiles.add_parser("get", help="Retrieve profile")
+    profile_get_parser.add_argument("profile_id", help="Profile ID to retrieve", type=str)
+    profile_list_parser = subparser_profiles.add_parser("list", help="List profiles")
 
     subparser_studies = subparser_top.add_parser("studies", aliases=["s", "study"],
                                                  help="Studies").add_subparsers(dest="subcommand", required=True)
