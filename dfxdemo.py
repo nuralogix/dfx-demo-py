@@ -108,7 +108,8 @@ async def main(args):
             elif args.subcommand == "list":
                 _, measurements = await dfxapi.Measurements.list(session,
                                                                  limit=args.limit,
-                                                                 user_profile_id=args.profile_id)
+                                                                 user_profile_id=args.profile_id,
+                                                                 partner_id=args.partner_id)
                 print(json.dumps(measurements)) if args.json else PP.print_pretty(measurements, args.csv)
         return
 
@@ -226,7 +227,10 @@ async def main(args):
     # Make a measurement
     async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
         # Create a measurement on the API and get the measurement ID
-        _, response = await dfxapi.Measurements.create(session, config["selected_study"])
+        _, response = await dfxapi.Measurements.create(session,
+                                                       config["selected_study"],
+                                                       user_profile_id=args.profile_id,
+                                                       partner_id=args.partner_id)
         app.measurement_id = response["ID"]
         print(f"Created measurement {app.measurement_id}")
 
@@ -635,6 +639,7 @@ def cmdline():
     list_parser = subparser_meas.add_parser("list", help="List existing measurements")
     list_parser.add_argument("--limit", help="Number of measurements to retrieve (default : 10)", type=int, default=10)
     list_parser.add_argument("--profile_id", help="Filter list by Profile ID", type=str, default="")
+    list_parser.add_argument("--partner_id", help="Filter list by Partner ID", type=str, default="")
     get_parser = subparser_meas.add_parser("get", help="Retrieve a measurement")
     get_parser.add_argument("measurement_id",
                             nargs="?",
@@ -654,6 +659,8 @@ def cmdline():
                              type=float,
                              default=None)
     make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
+    make_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
+    make_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
     make_parser.add_argument("--debug_study_cfg_file",
                              help="Study config file to use instead of data from API (debugging)",
                              type=str,
@@ -671,6 +678,8 @@ def cmdline():
                                help="Measurement duration (seconds)",
                                type=float,
                                default=30)
+    camera_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
+    camera_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
     camera_parser.add_argument("--debug_study_cfg_file",
                                help="Study config file to use instead of data from API (debugging)",
                                type=str,
@@ -683,6 +692,8 @@ def cmdline():
     mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
                                              help="Make a measurement from saved SDK chunks (debugging)")
     mk_ch_parser.add_argument("debug_chunks_folder", help="Folder containing SDK chunks", type=str)
+    mk_ch_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
+    mk_ch_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
     args = parser.parse_args()
 
     # asyncio.run(main(args))  # https://github.com/aio-libs/aiohttp/issues/4324
