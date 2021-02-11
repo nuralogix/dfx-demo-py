@@ -20,3 +20,4 @@ class AppState:
     begin_frame = 0
     end_frame = 0
     constraints_cfg = None
+    demographics = None
