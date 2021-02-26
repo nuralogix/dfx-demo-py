@@ -553,7 +553,7 @@ async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer,
                 app.end_frame = frame_number + app.end_frame
 
         # Track faces
-        tracked_faces = tracker.trackFaces(image)
+        tracked_faces = tracker.trackFaces(image, frame_number, frame_timestamp_ns / 1000000.0)
 
         # Create a DFX VideoFrame, then a DFX Frame from the DFX VideoFrame and add DFX faces to it
         dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_timestamp_ns,
@@ -724,7 +724,10 @@ def cmdline():
     make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
     make_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
     make_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
-    make_parser.add_argument("--demographics", help="Path to JSON file containing user demographics", default=None)
+    make_parser.add_argument("-dg",
+                             "--demographics",
+                             help="Path to JSON file containing user demographics",
+                             default=None)
     make_parser.add_argument("--debug_study_cfg_file",
                              help="Study config file to use instead of data from API (debugging)",
                              type=str,
@@ -744,7 +747,10 @@ def cmdline():
                                default=30)
     camera_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
     camera_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
-    camera_parser.add_argument("--demographics", help="Path to JSON file containing user demographics", default=None)
+    camera_parser.add_argument("-dg",
+                               "--demographics",
+                               help="Path to JSON file containing user demographics",
+                               default=None)
     camera_parser.add_argument("--debug_study_cfg_file",
                                help="Study config file to use instead of data from API (debugging)",
                                type=str,
@@ -759,7 +765,10 @@ def cmdline():
     mk_ch_parser.add_argument("debug_chunks_folder", help="Folder containing SDK chunks", type=str)
     mk_ch_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
     mk_ch_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
-    mk_ch_parser.add_argument("--demographics", help="Path to JSON file containing user demographics", default=None)
+    mk_ch_parser.add_argument("-dg",
+                              "--demographics",
+                              help="Path to JSON file containing user demographics",
+                              default=None)
     args = parser.parse_args()
 
     # asyncio.run(main(args))  # https://github.com/aio-libs/aiohttp/issues/4324

@@ -51,7 +51,7 @@ class DlibTracker():
             except queue.Full:
                 pass
 
-    def trackFaces(self, image, searchRect=None, desiredAttributes=None):
+    def trackFaces(self, image, frameNumber, timeStamp_ms, searchRect=None, desiredAttributes=None):
         x, y, w, h = self._sanitizeRoi(image.shape, searchRect)
         searchImage = image[y:y + h, x:x + w]
 
