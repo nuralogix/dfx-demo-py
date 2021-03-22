@@ -285,7 +285,8 @@ async def main(args):
         async with session.ws_connect(dfxapi.Settings.ws_url) as ws:
             # Subscribe to results
             results_request_id = generate_reqid()
-            await dfxapi.Measurements.ws_subscribe_to_results(ws, results_request_id, app.measurement_id)
+            await dfxapi.Measurements.ws_subscribe_to_results(ws, generate_reqid(), app.measurement_id,
+                                                              results_request_id)
 
             # Queue to pass chunks between coroutines
             chunk_queue = asyncio.Queue(app.number_chunks)
@@ -350,7 +351,7 @@ async def main(args):
                 num_results_received = 0
                 async for msg in ws:
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
-                    if request_id == results_request_id and len(payload) > 0:
+                    if request_id == results_request_id:
                         sdk_result = collector.decodeMeasurementResult(payload)
                         result = DfxSdkHelpers.sdk_result_to_dict(sdk_result)
                         renderer.set_results(result.copy())
