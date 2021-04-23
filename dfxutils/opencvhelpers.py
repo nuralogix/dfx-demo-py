@@ -113,10 +113,13 @@ class VideoReader:
             self._videocap.set(cv2.CAP_PROP_POS_FRAMES, self.start_frame)
 
     def _find_video_rotation(self, video_path):
-        mi = MediaInfo.parse(video_path)
-        for track in mi.tracks:
-            if track.track_type == "Video":
-                return track.rotation
+        try:
+            mi = MediaInfo.parse(video_path)
+            for track in mi.tracks:
+                if track.track_type == "Video":
+                    return track.rotation
+        except Exception:
+            print("Could not determine rotation, using 0")
         return 0
 
     def close(self):
