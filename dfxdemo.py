@@ -242,23 +242,54 @@ async def main(args):
 
     elif args.subcommand == "debug_make_from_chunks":
         # .. or using previously saved chunks
-        payload_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "payload*.bin")))
-        meta_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "metadata*.bin")))
-        prop_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "properties*.json")))
-        number_files = min(len(payload_files), len(meta_files), len(prop_files))
-        if number_files <= 0:
-            print(f"No payload files found in {args.debug_chunks_folder}")
-            return
-        with open(prop_files[0], 'r') as pr:
-            props = json.load(pr)
-            app.number_chunks = props["number_chunks"]
-            duration_pr = props["duration_s"]
-        if app.number_chunks != number_files:
-            print(f"Number of chunks in properties.json {app.number_chunks} != Number of payload files {number_files}")
-            return
-        if duration_pr * app.number_chunks > 120:
-            print(f"Total payload duration {duration_pr * app.number_chunks} seconds is more than 120 seconds")
-            return
+        if not args.alt:
+            payload_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "payload*.bin")))
+            meta_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "metadata*.bin")))
+            prop_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "properties*.json")))
+            number_files = min(len(payload_files), len(meta_files), len(prop_files))
+            if number_files <= 0:
+                print(f"No payload files found in {args.debug_chunks_folder}")
+                return
+            with open(prop_files[0], 'r') as pr:
+                props = json.load(pr)
+                app.number_chunks = props["number_chunks"]
+                duration_pr = props["duration_s"]
+            if app.number_chunks != number_files:
+                print(
+                    f"Number of chunks in properties.json {app.number_chunks} != Number of payload files {number_files}"
+                )
+                return
+            if duration_pr * app.number_chunks > 120:
+                print(f"Total payload duration {duration_pr * app.number_chunks} seconds is more than 120 seconds")
+                return
+        else:
+            payload_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "payload*.bin")))
+            meta_files = sorted(glob.glob(os.path.join(args.debug_chunks_folder, "meta*.json")))
+            prop_files = meta_files
+            number_files = min(len(payload_files), len(meta_files), len(prop_files))
+            if number_files <= 0:
+                print(f"No payload files found in {args.debug_chunks_folder}")
+                return
+            app.number_chunks = number_files
+
+            # Guess the duration
+            duration_pr = None
+            with open(prop_files[0], 'r') as pr:
+                props = json.load(pr)
+                if "ChunkEndFrameTime_ms" in props:
+                    with open(prop_files[1], 'r') as pr2:
+                        props2 = json.load(pr2)
+                        duration_pr = (props2["ChunkEndFrameTime_ms"] - props["ChunkEndFrameTime_ms"]) / 1000.0
+            # but allow duration override...
+            if args.chunk_duration_s is not None:
+                duration_pr = args.chunk_duration_s
+            if duration_pr is None:
+                print("Could not determine chunk duration from files. Please use the --chunk_duration option")
+                return
+            if duration_pr * app.number_chunks > 120:
+                print(f"Total payload duration {duration_pr * app.number_chunks} seconds is more than 120 seconds")
+                return
+            app.chunk_duration_s = int(duration_pr)
 
         # Create DFX SDK factory (just so we can have a collector for decoding results)
         factory = dfxsdk.Factory()
@@ -316,7 +347,8 @@ async def main(args):
                     app)  # App
             else:  # args.subcommand == "debug_make_from_chunks":
                 renderer = NullRenderer()
-                produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files)
+                produce_chunks_coro = read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files, args.alt,
+                                                         app)
 
             # Coroutine to get chunks from chunk_queue and send chunk using WebSocket
             async def send_chunks():
@@ -388,7 +420,7 @@ async def main(args):
             if len(pending) > 0:  # If we had pending coroutines, it means something went wrong in the 'done' ones
                 for d in done:
                     e = d.exception()
-                    if type(e) != asyncio.CancelledError:
+                    if e is not None and type(e) != asyncio.CancelledError:
                         print(e)
                 print(f"Measurement {app.measurement_id} failed")
             else:
@@ -615,32 +647,43 @@ async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer,
     renderer.keep_render_last_frame()
 
 
-async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files):
-    for payload_file, meta_file, prop_file in zip(payload_files, meta_files, prop_files):
+async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files, alt, app):
+    for i, (payload_file, meta_file, prop_file) in enumerate(zip(payload_files, meta_files, prop_files)):
         with open(payload_file, 'rb') as p, open(meta_file, 'rb') as m, open(prop_file, 'r') as pr:
             payload_bytes = p.read()
             meta_bytes = m.read()
             props = json.load(pr)
 
             chunk = dfxsdk.Payload()
-            chunk.valid = props["valid"]
-            chunk.start_frame = props["start_frame"]
-            chunk.end_frame = props["end_frame"]
-            chunk.chunk_number = props["chunk_number"]
-            chunk.number_chunks = props["number_chunks"]
-            chunk.first_chunk_start_time_s = props["first_chunk_start_time_s"]
-            chunk.start_time_s = props["start_time_s"]
-            chunk.end_time_s = props["end_time_s"]
-            chunk.duration_s = props["duration_s"]
             chunk.number_payload_bytes = len(payload_bytes)
             chunk.payload_data = payload_bytes
             chunk.number_metadata_bytes = len(meta_bytes)
             chunk.metadata = meta_bytes
-
+            if not alt:
+                chunk.valid = props["valid"]
+                chunk.start_frame = props["start_frame"]
+                chunk.end_frame = props["end_frame"]
+                chunk.chunk_number = props["chunk_number"]
+                chunk.number_chunks = props["number_chunks"]
+                chunk.first_chunk_start_time_s = props["first_chunk_start_time_s"]
+                chunk.start_time_s = props["start_time_s"]
+                chunk.end_time_s = props["end_time_s"]
+                chunk.duration_s = props["duration_s"]
+            else:
+                chunk.valid = 1
+                chunk.chunk_number = i
+                chunk.number_chunks = app.number_chunks
+                chunk.duration_s = app.chunk_duration_s
+                if "ChunkEndFrameTime_ms" in props:
+                    chunk.end_time_s = int(props["ChunkEndFrameTime_ms"] / 1000.0)
+                    chunk.start_time_s = int(chunk.end_time_s - chunk.duration_s)
+                elif type(props["StartTime"]) in [int, float]:
+                    chunk.start_time_s = int(props["StartTime"])
+                    chunk.end_time_s = int(chunk.start_time_s + chunk.duration_s)
             await chunk_queue.put(chunk)
 
             # Sleep to simulate a live measurement and not hit the rate limit
-            sleep_time = props["duration_s"]
+            sleep_time = chunk.duration_s
             await asyncio.sleep(sleep_time)
 
     await chunk_queue.put(None)
@@ -764,6 +807,8 @@ def cmdline():
     mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
                                              help="Make a measurement from saved SDK chunks (debugging)")
     mk_ch_parser.add_argument("debug_chunks_folder", help="Folder containing SDK chunks", type=str)
+    mk_ch_parser.add_argument("--alt", help="Alternate payload format", action="store_true", default=False)
+    mk_ch_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=None)
     mk_ch_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
     mk_ch_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
     mk_ch_parser.add_argument("-dg",
