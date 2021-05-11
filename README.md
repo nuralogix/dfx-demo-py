@@ -153,6 +153,23 @@ List historical measurements
 python dfxdemo.py measurements list
 ```
 
+## Additional instructions for developers in China
+
+If you intend to use the DeepAffex™ Cloud API in mainland China, please save
+the following snippet as `config.json` in the same folder as `dfxdemo.py`
+*before* using the example.
+
+## 中国大陆的开发者请注意
+
+DeepAffex™云端API在中国大陆使用一个不同于默认地址的URL。请将以下json代码在dfxdemo.py的同一目录下保存为config.json再使用。
+
+```json
+{
+    "rest_url": "https://api.deepaffex.cn:9443",
+    "ws_url": "wss://api.deepaffex.cn:9080"
+}
+```
+
 ## Additional resources
 
 * [Developers Guide](http://docs.deepaffex.ai/guide/index.html)
