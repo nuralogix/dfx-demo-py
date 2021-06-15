@@ -759,7 +759,7 @@ def cmdline():
                             default=None)
     make_parser = subparser_meas.add_parser("make", help="Make a measurement from a video file")
     make_parser.add_argument("video_path", help="Path to video file", type=str)
-    make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.01)
+    make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.0)
     make_parser.add_argument("-t", "--start_time", help="Video segment start time (seconds)", type=float, default=None)
     make_parser.add_argument("-T", "--end_time", help="Video segment end time (seconds)", type=float, default=None)
     make_parser.add_argument("--fps",
@@ -788,7 +788,7 @@ def cmdline():
 
     camera_parser = subparser_meas.add_parser("make_camera", help="Make a measurement from a camera")
     camera_parser.add_argument("--camera", help="Camera ID", type=int, default=0)
-    camera_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.01)
+    camera_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.0)
     camera_parser.add_argument("-md",
                                "--measurement_duration_s",
                                help="Measurement duration (seconds)",
