@@ -322,8 +322,8 @@ async def main(args):
             # Queue to pass chunks between coroutines
             chunk_queue = asyncio.Queue(app.number_chunks)
 
-            # When we receive `results_expected` results, we close the WebSocket in `receive_results`
-            results_expected = app.number_chunks
+            # When we receive the last chunk from the SDK, we can check for measurement completion
+            app.last_chunk_sent = False
 
             # Coroutine to produce chunks and put then in chunk_queue
             if args.subcommand == "make" or args.subcommand == "make_camera":
@@ -368,6 +368,10 @@ async def main(args):
                     print(f"Sent chunk {chunk.chunk_number}")
                     renderer.set_sent(chunk.chunk_number)
 
+                    # Update data needed to check for completion
+                    app.number_chunks_sent += 1
+                    app.last_chunk_sent = action == 'LAST::PROCESS'
+
                     # Save chunk (for debugging purposes)
                     if "debug_save_chunks_folder" in args and args.debug_save_chunks_folder:
                         DfxSdkHelpers.save_chunk(copy.copy(chunk), args.debug_save_chunks_folder)
@@ -389,7 +393,8 @@ async def main(args):
                         renderer.set_results(result.copy())
                         PP.print_sdk_result(result)
                         num_results_received += 1
-                    if num_results_received == results_expected:
+                    # We are done if the last chunk is sent and number of results received equals number of chunks sent
+                    if app.last_chunk_sent and num_results_received == app.number_chunks_sent:
                         await ws.close()
                         break
 

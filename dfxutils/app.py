@@ -17,6 +17,8 @@ class AppState:
     is_camera = False
     measurement_id = ""
     number_chunks = 0
+    number_chunks_sent = 0
+    last_chunk_sent = False
     begin_frame = 0
     end_frame = 0
     constraints_cfg = None
