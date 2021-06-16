@@ -19,6 +19,7 @@ class DfxSdkHelpers:
             "end_time_s": chunk.end_time_s,
             "duration_s": chunk.duration_s,
         }
+        os.makedirs(output_folder, exist_ok=True)
         prop_path = os.path.join(output_folder, f"properties{chunk.chunk_number:04}.json")
         payload_path = os.path.join(output_folder, f"payload{chunk.chunk_number:04}.bin")
         meta_path = os.path.join(output_folder, f"metadata{chunk.chunk_number:04}.bin")
