@@ -237,9 +237,6 @@ async def main(args):
             app.constraints_cfg.minimumFps = 10
             collector.setConstraintsConfig("json", str(app.constraints_cfg))
 
-        # If it's a video file, we immediately start extraction
-        app.step = MeasurementStep.USER_STARTED if not app.is_camera else MeasurementStep.NOT_READY
-
     elif args.subcommand == "debug_make_from_chunks":
         # .. or using previously saved chunks
         if not args.alt:
@@ -620,6 +617,9 @@ async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer,
                     app.step = MeasurementStep.FAILED
                     reasons = DfxSdkHelpers.failure_causes_from_constraints(c_details)
                     print(reasons)
+        else:
+            if app.step == MeasurementStep.NOT_READY and len(tracked_faces) > 0:
+                app.step = MeasurementStep.USER_STARTED
 
         # Extract bloodflow if the measurement has started
         if app.step == MeasurementStep.MEASURING:
