@@ -685,6 +685,9 @@ async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files,
                 elif type(props["StartTime"]) in [int, float]:
                     chunk.start_time_s = int(props["StartTime"])
                     chunk.end_time_s = int(chunk.start_time_s + chunk.duration_s)
+                elif type(props["StartTime"]) == dict:  # TODO: Verify
+                    chunk.start_time_s = props["StartTime"]["low"]
+                    chunk.end_time_s = props["EndTime"]["low"]
             await chunk_queue.put(chunk)
 
             # Sleep to simulate a live measurement and not hit the rate limit
