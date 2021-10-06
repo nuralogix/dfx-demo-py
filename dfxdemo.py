@@ -56,7 +56,7 @@ async def main(args):
     # Handle "users" commands - "login" and "logout"
     if args.command in ["u", "user", "users"]:
         if args.subcommand == "logout":
-            success = logout(config)
+            success = await logout(config)
         else:
             success = await login(config, args.email, args.password)
 
@@ -540,9 +540,16 @@ async def login(config, email, password):
             return False
 
 
-def logout(config):
-    config["user_token"] = ""
-    config["user_id"] = ""
+async def logout(config):
+    if not dfxapi.Settings.user_token:
+        print("Not logged in")
+        return False
+
+    headers = {"Authorization": f"Bearer {dfxapi.Settings.user_token}"}
+    async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
+        await dfxapi.Users.logout(session)
+        config["user_token"] = dfxapi.Settings.user_token
+        config["user_id"] = ""
     print("Logout successful")
     return True
 
