@@ -6,6 +6,7 @@ import glob
 import json
 import math
 import os.path
+import platform
 import random
 import string
 
@@ -832,12 +833,10 @@ def cmdline():
                               default=None)
     args = parser.parse_args()
 
-    # asyncio.run(main(args))  # https://github.com/aio-libs/aiohttp/issues/4324
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(args))
-    loop.run_until_complete(asyncio.sleep(0.25))  # https://github.com/aio-libs/aiohttp/issues/1925
-    loop.close()
+    # https://github.com/aio-libs/aiohttp/issues/4324
+    if platform.system() == "Windows":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    asyncio.run(main(args))
 
 
 if __name__ == '__main__':
