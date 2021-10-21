@@ -1,6 +1,8 @@
 import datetime
+import shutil
 
 TIMESTAMP_KEYS = ["Created", "Updated"]
+TERM_WIDTH, TERM_HEIGHT = shutil.get_terminal_size()
 
 
 class PrettyPrinter():
@@ -32,8 +34,6 @@ class PrettyPrinter():
                 result_data = measurement_results["Results"][signal_id][0]
                 units = measurement_results["SignalUnits"][signal_id]
                 description = measurement_results["SignalDescriptions"][signal_id]
-                if not csv and len(description) > 100:
-                    description = description[:100] + "..."
                 result_value = sum(result_data["Data"]) / len(result_data["Data"]) / result_data["Multiplier"] if len(
                     result_data["Data"]) > 0 and result_data["Multiplier"] > 0 else None
                 grid_result = {
@@ -107,10 +107,24 @@ class PrettyPrinter():
                 print(indent * " " + ",".join([f"{value}" for value in dict_.values()]))
             return
 
+        # Find the column widths
         col_widths = [len(str(k)) for k in list_of_dicts[0].keys()]
         for dict_ in list_of_dicts:
             for i, v in enumerate(dict_.values()):
                 col_widths[i] = max(col_widths[i], len(str(v)))
+
+        # If the sum of column widths exceeds the width of the terminal
+        spaces_between_cols = len(list_of_dicts[0].keys())
+        excess = sum(col_widths) + indent + spaces_between_cols - TERM_WIDTH
+        if excess > 0 and "Description" in list_of_dicts[0].keys():
+            # Shrink the "Description" column by the minimum amount possible
+            idx = list(list_of_dicts[0].keys()).index("Description")
+            col_widths[idx] = col_widths[idx] - excess
+            for dict_ in list_of_dicts:
+                if len(dict_["Description"]) > col_widths[idx]:
+                    dict_["Description"] = dict_["Description"][:col_widths[idx] - 3] + "..."
+
+        # Print the table header and table
         print(indent * " " + "".join([f"{str(key):{cw}} " for (cw, key) in zip(col_widths, list_of_dicts[0].keys())]))
         for dict_ in list_of_dicts:
             print(indent * " " + "".join([f"{str(value):{cw}} " for (cw, value) in zip(col_widths, dict_.values())]))
