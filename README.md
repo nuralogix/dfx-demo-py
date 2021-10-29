@@ -165,8 +165,8 @@ DeepAffex™云端API在中国大陆使用一个不同于默认地址的URL。�
 
 ```json
 {
-    "rest_url": "https://api.deepaffex.cn:9443",
-    "ws_url": "wss://api.deepaffex.cn:9080"
+    "rest_url": "https://api.deepaffex.cn",
+    "ws_url": "wss://api.deepaffex.cn"
 }
 ```
 

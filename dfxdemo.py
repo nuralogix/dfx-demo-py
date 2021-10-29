@@ -306,7 +306,8 @@ async def main(args):
         _, response = await dfxapi.Measurements.create(session,
                                                        config["selected_study"],
                                                        user_profile_id=args.profile_id,
-                                                       partner_id=args.partner_id)
+                                                       partner_id=args.partner_id,
+                                                       streaming=args.stream)
         app.measurement_id = response["ID"]
         print(f"Created measurement {app.measurement_id}")
 
@@ -796,6 +797,10 @@ def cmdline():
                              help="Save SDK chunks to folder (debugging)",
                              type=str,
                              default=None)
+    make_parser.add_argument("--stream",
+                             help="Make a streaming measurement",
+                             action="store_true",
+                             default=False)
 
     camera_parser = subparser_meas.add_parser("make_camera", help="Make a measurement from a camera")
     camera_parser.add_argument("--camera", help="Camera ID", type=int, default=0)
@@ -819,6 +824,10 @@ def cmdline():
                                help="Save SDK chunks to folder (debugging)",
                                type=str,
                                default=None)
+    camera_parser.add_argument("--stream",
+                               help="Make a streaming measurement",
+                               action="store_true",
+                               default=False)
 
     mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
                                              help="Make a measurement from saved SDK chunks (debugging)")
@@ -831,6 +840,10 @@ def cmdline():
                               "--demographics",
                               help="Path to JSON file containing user demographics",
                               default=None)
+    mk_ch_parser.add_argument("--stream",
+                              help="Make a streaming measurement",
+                              action="store_true",
+                              default=False)
     args = parser.parse_args()
 
     # https://github.com/aio-libs/aiohttp/issues/4324
