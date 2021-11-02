@@ -700,7 +700,7 @@ async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files,
             await chunk_queue.put(chunk)
 
             # Sleep to simulate a live measurement and not hit the rate limit
-            sleep_time = chunk.duration_s
+            sleep_time = max(chunk.duration_s, app.chunk_duration_s)
             await asyncio.sleep(sleep_time)
 
     await chunk_queue.put(None)
