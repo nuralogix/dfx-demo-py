@@ -2,14 +2,13 @@ from setuptools import setup, find_packages
 
 setup(
     name='dfxdemo',
-    version='0.8.0',
+    version='0.9.0',
     packages=find_packages(),
     install_requires=[
         'dfx-apiv2-client @ https://github.com/nuralogix/dfx-apiv2-client-py/tarball/master',
         'libdfx>=4.9',
-        'dlib>=19,!=19.22',
-        'opencv-python>=4',
-        'pymediainfo',
+        'dlib>=19,!=19.22,!=19.22.1',
+        'opencv-python>=4.5,<4.6'
     ],
     setup_requires=['cmake', 'wheel'],
     description='dfxdemo is a commandline demo for NuraLogix DeepAffex™ technologies.',

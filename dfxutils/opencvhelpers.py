@@ -2,7 +2,6 @@ import asyncio
 import time
 
 import cv2
-from pymediainfo import MediaInfo
 
 
 def _mirror_and_rotate(frame, mirror, rotation):
@@ -38,7 +37,7 @@ class CameraReader:
             raise RuntimeError(f"Camera framerate {self.fps} is invalid.")
 
         self._frame_number = 0
-        self.frame_duration_ns = 1000000000.0 / self.fps
+        self.frame_duration_s = 1.0 / self.fps
 
         self.mirror = mirror
         self.rotation = 0
@@ -57,7 +56,7 @@ class CameraReader:
             self._videocap.release()
 
     async def read_next_frame(self):
-        await asyncio.sleep(1.0 / self.fps)
+        await asyncio.sleep(self.frame_duration_s)
 
         frame_number = self._frame_number
         read = self._videocap.grab()
@@ -78,7 +77,13 @@ class CameraReader:
 
 
 class VideoReader:
-    def __init__(self, video_path, start_time=None, stop_time=None, rotation=None, fps=None) -> None:
+    def __init__(self,
+                 video_path,
+                 start_time=None,
+                 stop_time=None,
+                 rotation=None,
+                 fps=None,
+                 use_video_timestamps=False) -> None:
         self._videocap = cv2.VideoCapture(video_path)
         if not self._videocap.isOpened():
             raise RuntimeError(f"Could not open {video_path}")
@@ -87,8 +92,9 @@ class VideoReader:
         if self.fps <= 0:
             raise RuntimeError(f"Video framerate {self.fps} is invalid. Please override using '--fps' parameter.")
 
-        self.rotation = self._find_video_rotation(video_path) if rotation is None else rotation
-        self.frame_duration_ns = 1000000000.0 / self.fps
+        self.rotation = 0 if rotation is None else rotation
+        self.frame_duration_ns = 1000_000_000.0 / self.fps
+        self.frame_duration_s = 1.0 / self.fps
 
         frames_in_source = int(self._videocap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.width = int(self._videocap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -112,32 +118,40 @@ class VideoReader:
         if self.start_frame > 0:
             self._videocap.set(cv2.CAP_PROP_POS_FRAMES, self.start_frame)
 
-    def _find_video_rotation(self, video_path):
-        try:
-            mi = MediaInfo.parse(video_path)
-            for track in mi.tracks:
-                if track.track_type == "Video":
-                    return track.rotation
-        except Exception:
-            print("Could not determine rotation, using 0")
-        return 0
+        self.use_video_timestamps = use_video_timestamps
+
+    # def _find_video_rotation(self, video_path):
+    #     try:
+    #         mi = MediaInfo.parse(video_path)
+    #         for track in mi.tracks:
+    #             if track.track_type == "Video":
+    #                 return track.rotation
+    #     except Exception:
+    #         print("Could not determine rotation, using 0")
+    #     return 0
 
     def close(self):
         if self._videocap.isOpened():
             self._videocap.release()
 
     async def read_next_frame(self):
-        if self.fps > 0:
-            await asyncio.sleep(1.0 / self.fps)
-        else:
-            await asyncio.sleep(0.033)
+        await asyncio.sleep(self.frame_duration_s)
 
         frame_number = int(self._videocap.get(cv2.CAP_PROP_POS_FRAMES))
         read, frame = self._videocap.read()
 
-        # Currently OpenCV doesn't handle videos with variable frame rates correctly but perhaps in the future this
-        # code will make sense
-        frame_timestamp_ns = self._videocap.get(cv2.CAP_PROP_POS_MSEC) * 1000_000
+        frame_timestamp_ns = frame_number * self.frame_duration_ns
+
+        # Get timestamps from video if asked to
+        if self.use_video_timestamps:
+            # Currently OpenCV doesn't handle videos with variable frame rates correctly but perhaps in the future this
+            # code will make sense
+            frame_timestamp_ns = self._videocap.get(cv2.CAP_PROP_POS_MSEC) * 1000_000
+
+            # On some videos, timestamps get read as 0.0 once you reach the end of the file
+            if frame_timestamp_ns <= 0.0 and frame_number > self.start_frame:
+                read = False
+                frame = None
 
         if read and frame is not None and frame.size != 0 and frame_number <= self.stop_frame:
             frame = _mirror_and_rotate(frame, self.mirror, self.rotation)

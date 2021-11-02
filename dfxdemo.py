@@ -167,7 +167,12 @@ async def main(args):
         try:
             # Open the camera or video
             imreader = CameraReader(args.camera, mirror=True) if app.is_camera else VideoReader(
-                args.video_path, args.start_time, args.end_time, rotation=args.rotation, fps=args.fps)
+                args.video_path,
+                args.start_time,
+                args.end_time,
+                rotation=args.rotation,
+                fps=args.fps,
+                use_video_timestamps=args.use_video_timestamps)
 
             # Open the demographics file if provided
             if args.demographics is not None:
@@ -782,6 +787,11 @@ def cmdline():
                              help="Use this rotation instead of detecting from video (Must be 0, 90, 180 or 270)",
                              type=float,
                              default=None)
+    make_parser.add_argument(
+        "--use-video-timestamps",
+        help="Use timestamps embedded in video instead of calculating from frame numbers (doesn't work on all videos)",
+        action="store_true",
+        default=False)
     make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
     make_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
     make_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
@@ -789,6 +799,7 @@ def cmdline():
                              "--demographics",
                              help="Path to JSON file containing user demographics",
                              default=None)
+    make_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
     make_parser.add_argument("--debug_study_cfg_file",
                              help="Study config file to use instead of data from API (debugging)",
                              type=str,
@@ -797,10 +808,6 @@ def cmdline():
                              help="Save SDK chunks to folder (debugging)",
                              type=str,
                              default=None)
-    make_parser.add_argument("--stream",
-                             help="Make a streaming measurement",
-                             action="store_true",
-                             default=False)
 
     camera_parser = subparser_meas.add_parser("make_camera", help="Make a measurement from a camera")
     camera_parser.add_argument("--camera", help="Camera ID", type=int, default=0)
@@ -816,6 +823,7 @@ def cmdline():
                                "--demographics",
                                help="Path to JSON file containing user demographics",
                                default=None)
+    camera_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
     camera_parser.add_argument("--debug_study_cfg_file",
                                help="Study config file to use instead of data from API (debugging)",
                                type=str,
@@ -824,10 +832,6 @@ def cmdline():
                                help="Save SDK chunks to folder (debugging)",
                                type=str,
                                default=None)
-    camera_parser.add_argument("--stream",
-                               help="Make a streaming measurement",
-                               action="store_true",
-                               default=False)
 
     mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
                                              help="Make a measurement from saved SDK chunks (debugging)")
@@ -840,10 +844,7 @@ def cmdline():
                               "--demographics",
                               help="Path to JSON file containing user demographics",
                               default=None)
-    mk_ch_parser.add_argument("--stream",
-                              help="Make a streaming measurement",
-                              action="store_true",
-                              default=False)
+    mk_ch_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
     args = parser.parse_args()
 
     # https://github.com/aio-libs/aiohttp/issues/4324
