@@ -38,7 +38,6 @@ Please ensure you have the following software installed:
   ```shell
   sudo apt-get install build-essential git # Compiler and Git
   sudo apt-get install python3.8-dev python3.8-venv # or 3.7
-  sudo apt-get install python3-mediainfodll # for pymediainfo
   sudo apt-get install libopenblas-dev liblapack-dev # for Dlib
   ```
 
@@ -80,6 +79,22 @@ pip install -e .
 `dfxdemo` has top-level commands that roughly correspond to the way the DFX API
 is organized. All commands and subcommands have a `--help` argument.
 
+## Install and run using Docker
+
+```shell
+docker build . -t dfxdemo
+docker image prune -f  # Optional
+docker run -it \  # To run most commands
+  --mount type=bind,src=.,dst=/app \  # Location of config.json etc. files
+  dfxdemo org register <your_license_key>
+# etc.
+docker run -it \  # To run `measure make`
+  --mount type=bind,src=.,dst=/app \  # Location of config.json etc. files
+  --mount type=bind,src=./res/,dst=/app/res/ \  # Location of config.json etc. files
+  --mount type=bind,src=$HOME/path/to/videos,dst=/videos  \ # Location of videos
+  dfxdemo measure make --no_render /videos/dfxDemoCP1.mov
+```
+
 ### Register your license
 
 Register your organization license on the DeepAffex™ Cloud to obtain a *device
@@ -87,7 +102,7 @@ token*. This is generally the first thing you have to do (unless you don't want
 to make a measurement.)
 
 ```shell
-python dfxdemo.py org register <your_license_key>
+dfxdemo org register <your_license_key>
 ```
 
 **Note**: By default, the demo stores tokens in a file called `config.json`.
@@ -98,7 +113,7 @@ python dfxdemo.py org register <your_license_key>
 Login as a user to obtain a *user token*.
 
 ```shell
-python dfxdemo.py user login <email> <password>
+dfxdemo user login <email> <password>
 ```
 
 **Note**: All the commands below, use the tokens obtained above.
@@ -115,14 +130,14 @@ Study is a collection of biosignals of interest that are computed in one
 measurement.
 
 ```shell
-python dfxdemo.py studies list
-python dfxdemo.py study get <study_id>
+dfxdemo studies list
+dfxdemo study get <study_id>
 ```
 
 Select a study for use in measurements.
 
 ```shell
-python dfxdemo.py study select <study_id>
+dfxdemo study select <study_id>
 ```
 
 ### Measurements
@@ -130,7 +145,7 @@ python dfxdemo.py study select <study_id>
 Make a measurement from a video using the selected study
 
    ```shell
-   python dfxdemo.py measure make /path/to/video_file
+   dfxdemo measure make /path/to/video_file
    ```
 
 or
@@ -138,19 +153,19 @@ or
 Make a measurment from a webcam using the selected study
 
   ```shell
-  python dfxdemo.py measure make_camera
+  dfxdemo measure make_camera
   ```
 
 Retrieve detailed results of the last measurement
 
 ```shell
-python dfxdemo.py measure get
+dfxdemo measure get
 ```
 
 List historical measurements
 
 ```shell
-python dfxdemo.py measurements list
+dfxdemo measurements list
 ```
 
 ## Additional instructions for developers in China

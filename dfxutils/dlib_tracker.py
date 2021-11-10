@@ -1,5 +1,5 @@
 import multiprocessing as mp
-import os.path
+import os
 import queue
 from statistics import median
 
@@ -11,9 +11,7 @@ class DlibTracker():
     def __init__(self, face_detect_strategy=None):
         try:
             self._detect_proc = None
-
-            this_directory = os.path.dirname(os.path.abspath(__file__))
-            model_path = os.path.join(this_directory, "res", "shape_predictor_68_face_landmarks.dat")
+            model_path = os.path.join(os.getcwd(), "res", "shape_predictor_68_face_landmarks.dat")
 
             self._face_detector = dlib.get_frontal_face_detector()
             self._pose_estimator = dlib.shape_predictor(model_path)

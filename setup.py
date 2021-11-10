@@ -14,7 +14,7 @@ setup(
     description='dfxdemo is a commandline demo for NuraLogix DeepAffex™ technologies.',
     entry_points={
         'console_scripts': [
-            'dfxdemo = dfxdemo:cmdline',
+            'dfxdemo = dfxdemo.dfxdemo:cmdline',
         ],
     },
 )
