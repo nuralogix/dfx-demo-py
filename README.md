@@ -41,6 +41,8 @@ Please ensure you have the following software installed:
   sudo apt-get install libopenblas-dev liblapack-dev # for Dlib
   ```
 
+Note: Please see the section [Using Docker](#using-docker) for an alternative.
+
 ## Install `dfxdemo`
 
 Clone the dfxdemo application from Github.
@@ -78,22 +80,6 @@ pip install -e .
 
 `dfxdemo` has top-level commands that roughly correspond to the way the DFX API
 is organized. All commands and subcommands have a `--help` argument.
-
-## Install and run using Docker
-
-```shell
-docker build . -t dfxdemo
-docker image prune -f  # Optional
-docker run -it \  # To run most commands
-  --mount type=bind,src=.,dst=/app \  # Location of config.json etc. files
-  dfxdemo org register <your_license_key>
-# etc.
-docker run -it \  # To run `measure make`
-  --mount type=bind,src=.,dst=/app \  # Location of config.json etc. files
-  --mount type=bind,src=./res/,dst=/app/res/ \  # Location of config.json etc. files
-  --mount type=bind,src=$HOME/path/to/videos,dst=/videos  \ # Location of videos
-  dfxdemo measure make --no_render /videos/dfxDemoCP1.mov
-```
 
 ### Register your license
 
@@ -183,6 +169,38 @@ DeepAffex™云端API在中国大陆使用一个不同于默认地址的URL。�
     "rest_url": "https://api.deepaffex.cn",
     "ws_url": "wss://api.deepaffex.cn"
 }
+```
+
+## Using Docker
+
+You can experiment with `dfxdemo` using Docker by following the instructions
+below. There are a few limitations:
+
+* `measure make_camera` will not work since the container doesn't have access
+  to a camera
+* `--no_render` needs to be passed to `measure make` since the container doesn't
+  have access to a X-server.
+
+### Build the image
+
+```shell
+docker build . -t dfxdemo
+docker image prune -f  # Optional
+```
+
+### Run the `dfxdemo` container
+
+In the commands below, please replace `${PWD}` with `%CD%` on Windows.
+
+```shell
+docker run -it \    # To run most commands
+  -v ${PWD}:/app \  # Location of config.json etc. files
+  dfxdemo org register <your_license_key>
+# etc.
+docker run -it \                    # To run `measure make`
+  -v ${PWD}:/app \                  # Location of config.json, res etc. files
+  -v /path/to/videos,dst=/videos  \ # Location of videos
+  dfxdemo measure make --no_render /videos/video_file
 ```
 
 ## Additional resources
