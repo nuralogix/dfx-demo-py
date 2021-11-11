@@ -23,7 +23,8 @@ COPY dfxdemo/*.py dfxdemo/
 COPY dfxutils/*.py dfxutils/
 
 # Install everything into the venv
-RUN pip install . --disable-pip-version-check wheel --find-links /wheel
+RUN pip install wheel --no-cache-dir --disable-pip-version-check && \
+    pip install . --disable-pip-version-check --no-cache-dir --use-feature=in-tree-build --find-links /wheel
 
 ## Stage 2
 FROM python:3.10-slim-bullseye
