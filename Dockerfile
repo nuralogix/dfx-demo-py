@@ -22,6 +22,9 @@ COPY *.py ./
 COPY dfxdemo/*.py dfxdemo/
 COPY dfxutils/*.py dfxutils/
 
+# Switch to headless OpenCV
+RUN sed -i "s/opencv-python/opencv-python-headless/" setup.py
+
 # Install everything into the venv
 RUN pip install wheel --no-cache-dir --disable-pip-version-check && \
     pip install . --disable-pip-version-check --no-cache-dir --use-feature=in-tree-build --find-links /wheel
@@ -33,8 +36,6 @@ FROM python:3.10-slim-bullseye
 RUN apt-get update && apt-get install --no-install-recommends --yes \
     libopenblas0 \
     liblapack3 \
-    libgl1 \
-    libglib2.0-0 \
     libatomic1
 
 # Copy venv from previous stage and activate it

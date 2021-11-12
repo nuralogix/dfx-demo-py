@@ -197,7 +197,7 @@ In the commands below, please replace `${PWD}` with `%CD%` on Windows.
 docker run -it -v ${PWD}:/app dfxdemo org register <your_license_key>
 
 # To run `measure make`, use this, updating /path/to/videos to a path on your machine...
-docker run -it -v ${PWD}:/app -v /path/to/videos:/videos dfxdemo measure make --no_render /videos/video_file
+docker run -it -v ${PWD}:/app -v /path/to/videos:/videos dfxdemo measure make /videos/video_file
 ```
 
 ## Additional resources

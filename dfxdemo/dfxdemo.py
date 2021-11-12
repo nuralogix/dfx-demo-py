@@ -163,6 +163,7 @@ async def main(args):
     if args.subcommand == "make" or args.subcommand == "make_camera":
         # ..using a video or camera
         app.is_camera = args.subcommand == "make_camera"
+        headless = cv2.version.headless or args.headless
         image_src_name = f"Camera {args.camera}" if app.is_camera else os.path.basename(args.video_path)
         try:
             # Open the camera or video
@@ -337,7 +338,7 @@ async def main(args):
                     imreader.fps,
                     app,
                     0.5 if imreader.height >= 720 else 1.0,
-                ) if app.is_camera or not args.no_render else NullRenderer()
+                ) if app.is_camera or not headless else NullRenderer()
                 if not app.is_camera:
                     print("Extraction started")
                 else:
@@ -713,10 +714,11 @@ async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files,
 
 def cmdline():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-v",
-                        "--version",
-                        action="version",
-                        version=f"%(prog)s {_version} (libdfx v{dfxsdk.__version__})")
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s{' (headless) ' if cv2.version.headless else ''} {_version} (libdfx v{dfxsdk.__version__})")
     parser.add_argument("-c", "--config_file", help="Path to config file", default="./config.json")
     pp_group = parser.add_mutually_exclusive_group()
     pp_group.add_argument("--json", help="Print as JSON", action="store_true", default=False)
@@ -792,7 +794,8 @@ def cmdline():
         help="Use timestamps embedded in video instead of calculating from frame numbers (doesn't work on all videos)",
         action="store_true",
         default=False)
-    make_parser.add_argument("--no_render", help="Disable video rendering", action="store_true", default=False)
+    if not cv2.version.headless:
+        make_parser.add_argument("--headless", help="Disable video rendering", action="store_true", default=False)
     make_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
     make_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
     make_parser.add_argument("-dg",
@@ -809,29 +812,34 @@ def cmdline():
                              type=str,
                              default=None)
 
-    camera_parser = subparser_meas.add_parser("make_camera", help="Make a measurement from a camera")
-    camera_parser.add_argument("--camera", help="Camera ID", type=int, default=0)
-    camera_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.0)
-    camera_parser.add_argument("-md",
-                               "--measurement_duration_s",
-                               help="Measurement duration (seconds)",
-                               type=float,
-                               default=30)
-    camera_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
-    camera_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
-    camera_parser.add_argument("-dg",
-                               "--demographics",
-                               help="Path to JSON file containing user demographics",
-                               default=None)
-    camera_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
-    camera_parser.add_argument("--debug_study_cfg_file",
-                               help="Study config file to use instead of data from API (debugging)",
-                               type=str,
-                               default=None)
-    camera_parser.add_argument("--debug_save_chunks_folder",
-                               help="Save SDK chunks to folder (debugging)",
-                               type=str,
-                               default=None)
+    if not cv2.version.headless:
+        camera_parser = subparser_meas.add_parser("make_camera", help="Make a measurement from a camera")
+        camera_parser.add_argument("--camera", help="Camera ID", type=int, default=0)
+        camera_parser.add_argument("-cd",
+                                   "--chunk_duration_s",
+                                   help="Chunk duration (seconds)",
+                                   type=float,
+                                   default=5.0)
+        camera_parser.add_argument("-md",
+                                   "--measurement_duration_s",
+                                   help="Measurement duration (seconds)",
+                                   type=float,
+                                   default=30)
+        camera_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
+        camera_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
+        camera_parser.add_argument("-dg",
+                                   "--demographics",
+                                   help="Path to JSON file containing user demographics",
+                                   default=None)
+        camera_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
+        camera_parser.add_argument("--debug_study_cfg_file",
+                                   help="Study config file to use instead of data from API (debugging)",
+                                   type=str,
+                                   default=None)
+        camera_parser.add_argument("--debug_save_chunks_folder",
+                                   help="Save SDK chunks to folder (debugging)",
+                                   type=str,
+                                   default=None)
 
     mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
                                              help="Make a measurement from saved SDK chunks (debugging)")
