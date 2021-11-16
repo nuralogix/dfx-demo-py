@@ -163,7 +163,7 @@ async def main(args):
     if args.subcommand == "make" or args.subcommand == "make_camera":
         # ..using a video or camera
         app.is_camera = args.subcommand == "make_camera"
-        headless = cv2.version.headless or args.headless
+        headless = cv2.version.headless or "headless" in args
         image_src_name = f"Camera {args.camera}" if app.is_camera else os.path.basename(args.video_path)
         try:
             # Open the camera or video
@@ -689,6 +689,7 @@ async def read_folder_chunks(chunk_queue, payload_files, meta_files, prop_files,
                 chunk.start_time_s = props["start_time_s"]
                 chunk.end_time_s = props["end_time_s"]
                 chunk.duration_s = props["duration_s"]
+                app.chunk_duration_s = chunk.duration_s
             else:
                 chunk.valid = 1
                 chunk.chunk_number = i
