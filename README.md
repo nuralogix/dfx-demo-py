@@ -194,10 +194,10 @@ In the commands below, please replace `${PWD}` with `%CD%` on Windows.
 
 ```shell
 # To run most commands, use this, assuming ${PWD} contains config.json etc.
-docker run -it -v ${PWD}:/app dfxdemo org register <your_license_key>
+docker run -it --rm -v ${PWD}:/app dfxdemo org register <your_license_key>
 
 # To run `measure make`, use this, updating /path/to/videos to a path on your machine...
-docker run -it -v ${PWD}:/app -v /path/to/videos:/videos dfxdemo measure make /videos/video_file
+docker run -it --rm -v ${PWD}:/app -v /path/to/videos:/videos dfxdemo measure make /videos/video_file
 ```
 
 ## Additional resources
