@@ -163,7 +163,7 @@ async def main(args):
     if args.subcommand == "make" or args.subcommand == "make_camera":
         # ..using a video or camera
         app.is_camera = args.subcommand == "make_camera"
-        headless = cv2.version.headless or "headless" in args
+        headless = cv2.version.headless or "headless" in args and args.headless
         image_src_name = f"Camera {args.camera}" if app.is_camera else os.path.basename(args.video_path)
         try:
             # Open the camera or video
