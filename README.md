@@ -178,7 +178,7 @@ below. There are a few limitations:
 
 * `measure make_camera` will not work since the container doesn't have access
   to a camera
-* `--no_render` needs to be passed to `measure make` since the container doesn't
+* `--headless` needs to be passed to `measure make` since the container doesn't
   have access to a X-server.
 
 ### Build the image
