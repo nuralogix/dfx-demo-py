@@ -763,8 +763,8 @@ def cmdline():
                                   nargs="?",
                                   help="ID of study to retrieve (default: selected study)",
                                   type=str)
-    study_list_parser = subparser_studies.add_parser("select", help="Select a study to use")
-    study_list_parser.add_argument("study_id", help="ID of study to use", type=str)
+    study_select_parser = subparser_studies.add_parser("select", help="Select a study to use")
+    study_select_parser.add_argument("study_id", help="ID of study to use", type=str)
 
     subparser_meas = subparser_top.add_parser("measure", aliases=["m", "measurements"],
                                               help="Measurements").add_subparsers(dest="subcommand", required=True)
