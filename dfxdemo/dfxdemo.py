@@ -17,11 +17,23 @@ import libdfx as dfxsdk
 import pkg_resources
 
 from dfxutils.app import AppState, MeasurementStep
-from dfxutils.dlib_tracker import DlibTracker
 from dfxutils.opencvhelpers import CameraReader, VideoReader
 from dfxutils.prettyprint import PrettyPrinter as PP
 from dfxutils.renderer import NullRenderer, Renderer
 from dfxutils.sdkhelpers import DfxSdkHelpers
+
+FT_CHOICES = []
+try:
+    from dfxutils.visage_tracker import VisageTracker
+    FT_CHOICES.append("visage")
+except ImportError:
+    pass
+
+try:
+    from dfxutils.dlib_tracker import DlibTracker
+    FT_CHOICES.append("dlib")
+except ImportError:
+    pass
 
 try:
     _version = f"v{pkg_resources.require('dfxdemo')[0].version}"
@@ -181,7 +193,14 @@ async def main(args):
                     app.demographics = json.load(f)
 
             # Create a face tracker
-            tracker = DlibTracker()
+            if args.face_tracker == "visage":
+                tracker = VisageTracker(args.visage_license,
+                                        1,
+                                        imreader.width,
+                                        imreader.height,
+                                        use_analyser=args.analyser)
+            else:
+                tracker = DlibTracker()
 
             # Create DFX SDK factory
             factory = dfxsdk.Factory()
@@ -726,12 +745,15 @@ def cmdline():
     pp_group.add_argument("--csv", help="Print grids as CSV", action="store_true", default=False)
 
     subparser_top = parser.add_subparsers(dest="command", required=True)
+
+    # orgs - register, unregister
     subparser_orgs = subparser_top.add_parser("orgs", aliases=["o", "org"],
                                               help="Organizations").add_subparsers(dest="subcommand", required=True)
     register_parser = subparser_orgs.add_parser("register", help="Register device")
     register_parser.add_argument("license_key", help="DFX API Organization License")
     unregister_parser = subparser_orgs.add_parser("unregister", help="Unregister device")
 
+    # users - login, logout
     subparser_users = subparser_top.add_parser("users", aliases=["u", "user"],
                                                help="Users").add_subparsers(dest="subcommand", required=True)
     login_parser = subparser_users.add_parser("login", help="User login")
@@ -739,6 +761,7 @@ def cmdline():
     login_parser.add_argument("password", help="Password")
     logout_parser = subparser_users.add_parser("logout", help="User logout")
 
+    # profiles - create, update, remove, get, list
     subparser_profiles = subparser_top.add_parser("profiles", aliases=["p", "profile"],
                                                   help="Profiles").add_subparsers(dest="subcommand", required=True)
     profile_create_parser = subparser_profiles.add_parser("create", help="Create profile")
@@ -755,6 +778,7 @@ def cmdline():
     profile_get_parser.add_argument("profile_id", help="Profile ID to retrieve", type=str)
     profile_list_parser = subparser_profiles.add_parser("list", help="List profiles")
 
+    # studies - list, get, select
     subparser_studies = subparser_top.add_parser("studies", aliases=["s", "study"],
                                                  help="Studies").add_subparsers(dest="subcommand", required=True)
     study_list_parser = subparser_studies.add_parser("list", help="List existing studies")
@@ -766,6 +790,7 @@ def cmdline():
     study_select_parser = subparser_studies.add_parser("select", help="Select a study to use")
     study_select_parser.add_argument("study_id", help="ID of study to use", type=str)
 
+    # measure - list, get, make, make_camera, debug_make_from_chunks
     subparser_meas = subparser_top.add_parser("measure", aliases=["m", "measurements"],
                                               help="Measurements").add_subparsers(dest="subcommand", required=True)
     list_parser = subparser_meas.add_parser("list", help="List existing measurements")
@@ -777,43 +802,62 @@ def cmdline():
                             nargs="?",
                             help="ID of measurement to retrieve (default: last measurement)",
                             default=None)
-    make_parser = subparser_meas.add_parser("make", help="Make a measurement from a video file")
-    make_parser.add_argument("video_path", help="Path to video file", type=str)
-    make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.0)
-    make_parser.add_argument("-t", "--start_time", help="Video segment start time (seconds)", type=float, default=None)
-    make_parser.add_argument("-T", "--end_time", help="Video segment end time (seconds)", type=float, default=None)
-    make_parser.add_argument("--fps",
-                             help="Use this framerate instead of detecting from video",
-                             type=float,
-                             default=None)
-    make_parser.add_argument("--rotation",
-                             help="Use this rotation instead of detecting from video (Must be 0, 90, 180 or 270)",
-                             type=float,
-                             default=None)
-    make_parser.add_argument(
-        "--use-video-timestamps",
-        help="Use timestamps embedded in video instead of calculating from frame numbers (doesn't work on all videos)",
-        action="store_true",
-        default=False)
-    if not cv2.version.headless:
-        make_parser.add_argument("--headless", help="Disable video rendering", action="store_true", default=False)
-    make_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
-    make_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
-    make_parser.add_argument("-dg",
-                             "--demographics",
-                             help="Path to JSON file containing user demographics",
-                             default=None)
-    make_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
-    make_parser.add_argument("--debug_study_cfg_file",
-                             help="Study config file to use instead of data from API (debugging)",
-                             type=str,
-                             default=None)
-    make_parser.add_argument("--debug_save_chunks_folder",
-                             help="Save SDK chunks to folder (debugging)",
-                             type=str,
-                             default=None)
-
-    if not cv2.version.headless:
+    if FT_CHOICES:
+        make_parser = subparser_meas.add_parser("make", help="Make a measurement from a video file")
+        make_parser.add_argument("video_path", help="Path to video file", type=str)
+        make_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.0)
+        make_parser.add_argument("-t",
+                                 "--start_time",
+                                 help="Video segment start time (seconds)",
+                                 type=float,
+                                 default=None)
+        make_parser.add_argument("-T", "--end_time", help="Video segment end time (seconds)", type=float, default=None)
+        make_parser.add_argument("--fps",
+                                 help="Use this framerate instead of detecting from video",
+                                 type=float,
+                                 default=None)
+        make_parser.add_argument("--rotation",
+                                 help="Use this rotation instead of detecting from video (Must be 0, 90, 180 or 270)",
+                                 type=float,
+                                 default=None)
+        make_parser.add_argument("--use-video-timestamps",
+                                 help="Use timestamps embedded in video instead of calculating from frame numbers "
+                                 "(doesn't work on all videos)",
+                                 action="store_true",
+                                 default=False)
+        if not cv2.version.headless:
+            make_parser.add_argument("--headless", help="Disable video rendering", action="store_true", default=False)
+        make_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
+        make_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
+        make_parser.add_argument("-dg",
+                                 "--demographics",
+                                 help="Path to JSON file containing user demographics",
+                                 default=None)
+        make_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
+        make_parser.add_argument("--debug_study_cfg_file",
+                                 help="Study config file to use instead of data from API (debugging)",
+                                 type=str,
+                                 default=None)
+        make_parser.add_argument("--debug_save_chunks_folder",
+                                 help="Save SDK chunks to folder (debugging)",
+                                 type=str,
+                                 default=None)
+        make_parser.add_argument("-ft",
+                                 "--face_tracker",
+                                 help=f"Face tracker to use. (default: {FT_CHOICES[0]})",
+                                 default=FT_CHOICES[0],
+                                 choices=FT_CHOICES)
+        if "visage" in FT_CHOICES:
+            make_parser.add_argument("-vl",
+                                     "--visage_license",
+                                     help="Path to folder containing Visage License",
+                                     default="")
+            make_parser.add_argument("-va",
+                                     "--analyser",
+                                     help="Use Visage Face Analyser module",
+                                     action="store_true",
+                                     default=False)
+    if FT_CHOICES and not cv2.version.headless:
         camera_parser = subparser_meas.add_parser("make_camera", help="Make a measurement from a camera")
         camera_parser.add_argument("--camera", help="Camera ID", type=int, default=0)
         camera_parser.add_argument("-cd",
@@ -841,6 +885,21 @@ def cmdline():
                                    help="Save SDK chunks to folder (debugging)",
                                    type=str,
                                    default=None)
+        camera_parser.add_argument("-ft",
+                                   "--face_tracker",
+                                   help=f"Face tracker to use (default: {FT_CHOICES[0]})",
+                                   default=FT_CHOICES[0],
+                                   choices=FT_CHOICES)
+        if "visage" in FT_CHOICES:
+            camera_parser.add_argument("-vl",
+                                       "--visage_license",
+                                       help="Path to folder containing Visage License",
+                                       default="")
+            camera_parser.add_argument("-va",
+                                       "--analyser",
+                                       help="Use Visage Analysis module",
+                                       action="store_true",
+                                       default=False)
 
     mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
                                              help="Make a measurement from saved SDK chunks (debugging)")
