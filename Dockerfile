@@ -1,11 +1,11 @@
 ## Stage 1
 FROM python:3.10-slim-bullseye as create_venv
 
-# Manage options
-ARG EXTRAS_REQUIRE=dlib
-
 # Install build dependencies
 RUN apt-get update && apt-get install --no-install-recommends --yes build-essential
+
+# Manage options
+ARG EXTRAS_REQUIRE
 RUN bash -c 'if [[ $EXTRAS_REQUIRE == *"dlib"* ]]; then apt-get install --no-install-recommends --yes cmake libopenblas-dev liblapack-dev; fi'
 
 # Create venv and activate it
@@ -34,10 +34,12 @@ RUN pip install wheel --no-cache-dir --disable-pip-version-check && \
 
 ## Stage 2
 FROM python:3.10-slim-bullseye
-ARG EXTRAS_REQUIRE
 
 # Install run dependencies
 RUN apt-get update && apt-get install --no-install-recommends --yes libatomic1
+
+# Manage options
+ARG EXTRAS_REQUIRE
 RUN bash -c 'if [[ ${EXTRAS_REQUIRE} == *"dlib"* ]]; then apt-get install --no-install-recommends --yes libopenblas0 liblapack3; fi'
 RUN bash -c 'if [[ ${EXTRAS_REQUIRE} == *"visage"* ]]; then apt-get install --no-install-recommends --yes libgomp1; fi'
 

@@ -73,7 +73,7 @@ Install `dfxdemo` in editable mode (and automatically install other
 dependencies.) This may take a while as [Dlib](http://dlib.net/) gets compiled.
 
 ```shell
-pip install -e .
+pip install -e .[dlib]
 ```
 
 ## Run `dfxdemo`
@@ -184,7 +184,7 @@ below. There are a few limitations:
 ### Build the image
 
 ```shell
-docker build . -t dfxdemo
+docker build . -t dfxdemo --build-arg EXTRAS_REQUIRE=dlib
 docker image prune -f  # Optional
 ```
 
@@ -198,6 +198,14 @@ docker run -it --rm -v ${PWD}:/app dfxdemo org register <your_license_key>
 
 # To run `measure make`, use this, updating /path/to/videos to a path on your machine...
 docker run -it --rm -v ${PWD}:/app -v /path/to/videos:/videos dfxdemo measure make /videos/video_file
+```
+
+### Other options
+
+If you don't need to make measurements, then you can build without a facetracker.
+
+```shell
+docker build . -t dfxdemo --build-arg EXTRAS_REQUIRE=dummy
 ```
 
 ## Additional resources
