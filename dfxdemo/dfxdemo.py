@@ -229,6 +229,7 @@ async def main(args):
             print(f"DFX collector creation failed: {collector.getLastErrorMessage()}")
             return
 
+        print(f"Face Tracker: {args.face_tracker}")
         print("Created DFX Collector:")
         chunk_duration_s = float(args.chunk_duration_s)
         frames_per_chunk = math.ceil(chunk_duration_s * imreader.fps)
