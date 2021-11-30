@@ -17,7 +17,7 @@ ENV PATH="${VENV}/bin:${PATH}"
 ADD https://s3.us-east-2.amazonaws.com/nuralogix-assets/dfx-sdk/python/libdfx-4.9.3.0-py3-none-linux_x86_64.whl /wheel/
 
 # Add any local wheels
-ADD wheels/*.whl /wheel/
+ADD wheels/* /wheel/
 
 # Copy project files
 WORKDIR /app

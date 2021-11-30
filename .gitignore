@@ -144,3 +144,4 @@ creds.json
 .creds.json
 **/res/
 !**/res/README.txt
+!wheels/README.txt
