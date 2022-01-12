@@ -3,6 +3,7 @@ import shutil
 
 TIMESTAMP_KEYS = ["Created", "Updated"]
 TERM_WIDTH, TERM_HEIGHT = shutil.get_terminal_size()
+MIN_COL_WIDTH = 5
 
 
 class PrettyPrinter():
@@ -119,7 +120,7 @@ class PrettyPrinter():
         if excess > 0 and "Description" in list_of_dicts[0].keys():
             # Shrink the "Description" column by the minimum amount possible
             idx = list(list_of_dicts[0].keys()).index("Description")
-            col_widths[idx] = col_widths[idx] - excess
+            col_widths[idx] = max(col_widths[idx] - excess, MIN_COL_WIDTH)
             for dict_ in list_of_dicts:
                 if len(dict_["Description"]) > col_widths[idx]:
                     dict_["Description"] = dict_["Description"][:col_widths[idx] - 3] + "..."

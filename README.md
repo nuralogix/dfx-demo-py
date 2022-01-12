@@ -73,7 +73,7 @@ Install `dfxdemo` in editable mode (and automatically install other
 dependencies.) This may take a while as [Dlib](http://dlib.net/) gets compiled.
 
 ```shell
-pip install -e .[dlib]
+pip install -e ".[dlib]"
 ```
 
 ## Run `dfxdemo`
@@ -130,17 +130,17 @@ dfxdemo study select <study_id>
 
 Make a measurement from a video using the selected study
 
-   ```shell
-   dfxdemo measure make /path/to/video_file
-   ```
+```shell
+dfxdemo measure make /path/to/video_file
+```
 
 or
 
 Make a measurment from a webcam using the selected study
 
-  ```shell
-  dfxdemo measure make_camera
-  ```
+```shell
+dfxdemo measure make_camera
+```
 
 Retrieve detailed results of the last measurement
 
