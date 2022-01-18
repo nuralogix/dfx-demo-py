@@ -339,6 +339,11 @@ async def main(args):
 
         # Use the session to connect to the WebSocket
         async with session.ws_connect(dfxapi.Settings.ws_url) as ws:
+            # Auth using `ws_auth_with_token` if headers cannot be manipulated, normally you don't need to do this
+            # if "Authorization" not in session.headers:
+            #     await dfxapi.Organizations.ws_auth_with_token(ws, generate_reqid())
+            #     await ws.receive()  # Wait to receive response before proceeding..
+
             # Subscribe to results
             results_request_id = generate_reqid()
             await dfxapi.Measurements.ws_subscribe_to_results(ws, generate_reqid(), app.measurement_id,
