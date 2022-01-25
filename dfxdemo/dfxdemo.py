@@ -86,6 +86,21 @@ async def main(args):
     token = dfxapi.Settings.user_token if dfxapi.Settings.user_token else dfxapi.Settings.device_token
     headers = {"Authorization": f"Bearer {token}"}
 
+    # Verify that our token is still valid
+    async with aiohttp.ClientSession(headers=headers, raise_for_status=False) as session:
+        status, body = await dfxapi.General.verify_token(session)
+        if status >= 400:
+            print("Your token is not valid, please register and login again")
+            print(json.dumps(body)) if args.json else PP.print_pretty(body, args.csv)
+            config["device_id"] = ""
+            config["device_token"] = ""
+            config["role_id"] = ""
+            config["user_id"] = ""
+            config["user_token"] = ""
+            save_config(config, args.config_file)
+
+            return
+
     # Handle "profiles" commands - "create", "update", "remove", "get" and "list"
     if args.command in ["p", "profile", "profiles"]:
         async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
@@ -136,7 +151,7 @@ async def main(args):
                 if not measurement_id or measurement_id.isspace():
                     print("Please complete a measurement first or pass a measurement id")
                     return
-                _, results = await dfxapi.Measurements.retrieve(session, measurement_id)
+                _, results = await dfxapi.Measurements.retrieve(session, measurement_id, args.expand)
                 print(json.dumps(results)) if args.json else PP.print_result(results, args.csv)
             elif args.subcommand == "list":
                 _, measurements = await dfxapi.Measurements.list(session,
@@ -583,8 +598,8 @@ async def logout(config):
         await dfxapi.Users.logout(session)
         config["user_token"] = dfxapi.Settings.user_token
         config["user_id"] = ""
-    print("Logout successful")
-    return True
+        print("Logout successful")
+        return True
 
 
 async def retrieve_sdk_config(headers, config, config_file, sdk_id):
@@ -808,6 +823,7 @@ def cmdline():
                             nargs="?",
                             help="ID of measurement to retrieve (default: last measurement)",
                             default=None)
+    get_parser.add_argument("--expand", help="Retrieve vector results per signal", action="store_true", default=False)
     if FT_CHOICES:
         make_parser = subparser_meas.add_parser("make", help="Make a measurement from a video file")
         make_parser.add_argument("video_path", help="Path to video file", type=str)

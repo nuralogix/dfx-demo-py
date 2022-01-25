@@ -136,7 +136,7 @@ dfxdemo measure make /path/to/video_file
 
 or
 
-Make a measurment from a webcam using the selected study
+Make a measurement from a webcam using the selected study
 
 ```shell
 dfxdemo measure make_camera
