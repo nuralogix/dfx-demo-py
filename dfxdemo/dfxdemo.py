@@ -15,6 +15,7 @@ import cv2
 import dfx_apiv2_client as dfxapi
 import libdfx as dfxsdk
 import pkg_resources
+import yarl
 
 from dfxutils.app import AppState, MeasurementStep
 from dfxutils.opencvhelpers import CameraReader, VideoReader
@@ -44,6 +45,14 @@ except Exception:
 async def main(args):
     # Load config
     config = load_config(args.config_file)
+
+    # Check if alternate URL was passed
+    if "rest_url" in args and args.rest_url is not None:
+        url = yarl.URL(args.rest_url).with_path("")
+        dfxapi.Settings.rest_url = str(url)
+        dfxapi.Settings.ws_url = str(url.with_scheme("wss"))
+        config["rest_url"] = dfxapi.Settings.rest_url
+        config["ws_url"] = dfxapi.Settings.ws_url
 
     # Check API status
     async with aiohttp.ClientSession(raise_for_status=True) as session:
@@ -773,6 +782,7 @@ def cmdline():
                                               help="Organizations").add_subparsers(dest="subcommand", required=True)
     register_parser = subparser_orgs.add_parser("register", help="Register device")
     register_parser.add_argument("license_key", help="DFX API Organization License")
+    register_parser.add_argument("--rest-url", help="Connect to DFX API using this REST URL", default=None)
     unregister_parser = subparser_orgs.add_parser("unregister", help="Unregister device")
 
     # users - login, logout

@@ -156,19 +156,15 @@ dfxdemo measurements list
 
 ## Additional instructions for developers in China
 
-If you intend to use the DeepAffex™ Cloud API in mainland China, please save
-the following snippet as `config.json` in the same folder as `dfxdemo.py`
-*before* using the example.
+If you intend to use the DeepAffex™ Cloud API in mainland China, please use the
+the `--rest-url` option of the `dfxdemo org register` command as shown below:
 
 ## 中国大陆的开发者请注意
 
-DeepAffex™云端API在中国大陆使用一个不同于默认地址的URL。请将以下json代码在dfxdemo.py的同一目录下保存为config.json再使用。
+如果您在中国大陆使用DeepAffex™云端API, 在使用`dfxdemo org register`命令时, 请使用`-rest-url`选项, 如下所示。
 
-```json
-{
-    "rest_url": "https://api.deepaffex.cn",
-    "ws_url": "wss://api.deepaffex.cn"
-}
+```shell
+dfxdemo org register --rest-url https://api.deepaffex.cn/ <your_license_key>
 ```
 
 ## Using Docker
