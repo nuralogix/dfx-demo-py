@@ -273,8 +273,6 @@ async def main(args):
         print(f"    mode: {factory.getMode()}")
         print(f"    number chunks: {collector.getNumberChunks()}")
         print(f"    chunk duration: {collector.getChunkDurationSeconds()}s")
-        for constraint in collector.getEnabledConstraints():
-            print(f"    enabled constraint: {constraint}")
 
         # Set the demographics
         if app.demographics is not None:
@@ -288,6 +286,11 @@ async def main(args):
             app.constraints_cfg = DfxSdkHelpers.ConstraintsConfig(collector.getConstraintsConfig("json"))
             app.constraints_cfg.minimumFps = 10
             collector.setConstraintsConfig("json", str(app.constraints_cfg))
+
+        # Print the enabled constraints
+        print("Constraints:")
+        for constraint in collector.getEnabledConstraints():
+            print(f"    enabled: {constraint}")
 
     elif args.subcommand == "debug_make_from_chunks":
         # .. or using previously saved chunks
