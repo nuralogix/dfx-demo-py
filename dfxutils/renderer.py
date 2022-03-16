@@ -54,6 +54,9 @@ class Renderer():
         while not self._rendering_last:
             try:
                 render_image, meta = self._render_queue.get_nowait()
+                _, frame_number, frame_timestamp_ns = meta
+                if not self._rendering_last:
+                    self._timestamps_ns.append(frame_timestamp_ns)
 
                 render_image_copy = np.copy(render_image)
                 self._draw_on_image(render_image_copy, meta)
@@ -157,8 +160,6 @@ class Renderer():
         if not self._app.is_camera:
             msg = f"{self._image_src_name}: {self._fps:.2f} fps"
         else:
-            if not self._rendering_last:
-                self._timestamps_ns.append(frame_timestamp_ns)
             if len(self._timestamps_ns) >= 2:
                 deltas = [self._timestamps_ns[i + 1] - self._timestamps_ns[i] for i in range(len(self._timestamps_ns) - 1)]
                 avg_delta = sum(deltas) / len(deltas)
