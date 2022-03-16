@@ -223,7 +223,8 @@ async def main(args):
                                         1,
                                         imreader.width,
                                         imreader.height,
-                                        use_analyser=args.analyser)
+                                        use_analyser=args.analyser,
+                                        track_in_background=app.is_camera)
             else:
                 tracker = DlibTracker()
 

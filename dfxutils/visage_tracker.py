@@ -13,14 +13,30 @@
 #      NURALOGIX CORP SOFTWARE LICENSE AGREEMENT.
 #
 
+import multiprocessing as mp
 import os
+import queue
 import pathlib
 
 import libvisage as visage
+import numpy as np
 
 
 class VisageTracker():
-    def __init__(self, visageLicense, maxFaces, frameWidth, frameHeight, use_analyser):
+    def __init__(self, visageLicense, maxFaces, frameWidth, frameHeight, use_analyser, track_in_background=False):
+        self._visage_initialized = False
+        self._track_in_background = track_in_background
+        self._visage_init_params = visageLicense, use_analyser, maxFaces, frameWidth, frameHeight
+        if self._track_in_background:
+            self._last_tracked_faces = {}
+            self._work_queue = mp.Queue(1)
+            self._results_queue = mp.Queue(1)
+            self._track_proc = mp.Process(target=self._trackFacesThreaded, name="visage_tracker")
+            self._track_proc.start()
+        else:
+            self._initializeVisage(visageLicense, use_analyser, maxFaces, frameWidth, frameHeight)
+
+    def _initializeVisage(self, visageLicense, use_analyser, maxFaces, frameWidth, frameHeight):
         # Create a Visage Factory object
         self._visageFactory = visage.Factory()
 
@@ -46,6 +62,8 @@ class VisageTracker():
         # Create a faceData object
         self._faceData = self._visageFactory.createFaceData(maxFaces, frameWidth, frameHeight)
 
+        self._visage_initialized = True
+
     @staticmethod
     def __version__():
         return visage.__version__
@@ -59,13 +77,51 @@ class VisageTracker():
         else:
             return 191
 
+    def _trackFacesThreaded(self):
+        visageLicense, use_analyser, maxFaces, frameWidth, frameHeight = self._visage_init_params
+        self._initializeVisage(visageLicense, use_analyser, maxFaces, frameWidth, frameHeight)
+
+        while True:
+            image, frameNumber, timeStamp_ms = self._work_queue.get()
+            if image is None:
+                break
+            tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
+            try:
+                self._results_queue.put_nowait(tracked_faces)
+            except queue.Full:
+                pass
+
     def trackFaces(self, image, frameNumber, timeStamp_ms):
+        if self._track_in_background:
+            try:
+                self._work_queue.put_nowait((np.copy(image), frameNumber, timeStamp_ms))
+            except queue.Full:
+                pass
+
+            try:
+                self._last_tracked_faces = self._results_queue.get_nowait()
+            except queue.Empty:
+                pass
+
+            # Force face detection if the result was empty if using the "smart" strategy
+            if not self._last_tracked_faces:
+                self._last_tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
+        else:
+            self._last_tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
+
+        return self._last_tracked_faces
+
+    def _trackFaces(self, image, frameNumber, timeStamp_ms):
+        faces = {}
+
+        if not self._visage_initialized:
+            return faces
+
         # x, y, w, h = self._sanitizeRoi(image.shape, None)
         # searchImage = image[y:y + h, x:x + w]
         visageFrame = visage.VisageFrame.fromNumpy(image)
         statuses = self._tracker.track(visageFrame, timeStamp_ms, self._faceData)
 
-        faces = {}
         for faceNumber, status in enumerate(statuses):
             if status == visage.TrackerStatus.OK:
                 visageface = self._faceData[faceNumber]
@@ -135,4 +191,8 @@ class VisageTracker():
         return faces
 
     def stop(self):
-        pass
+        if self._track_in_background and self._track_proc and self._track_proc.is_alive():
+            self._work_queue.put(None)
+            self._track_proc.terminate()
+            self._work_queue.cancel_join_thread()
+            self._results_queue.cancel_join_thread()
