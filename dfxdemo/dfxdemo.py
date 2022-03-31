@@ -91,23 +91,11 @@ async def main(args):
         print("Please register and/or login first to obtain a token")
         return
 
-    # Use the token to create the headers
-    token = dfxapi.Settings.user_token if dfxapi.Settings.user_token else dfxapi.Settings.device_token
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # Verify that our token is still valid
-    async with aiohttp.ClientSession(headers=headers, raise_for_status=False) as session:
-        status, body = await dfxapi.General.verify_token(session)
-        if status >= 400:
-            print("Your token is not valid, please register and login again")
-            print(json.dumps(body)) if args.json else PP.print_pretty(body, args.csv)
-            config["device_id"] = ""
-            config["device_token"] = ""
-            config["role_id"] = ""
-            config["user_id"] = ""
-            config["user_token"] = ""
-            save_config(config, args.config_file)
-
+    # Verify and if necessary, attempt to renew the token
+    verified, renewed, headers, new_config = await verify_renew_token(config)
+    if not verified:
+        save_config(new_config, args.config_file)
+        if not renewed:
             return
 
     # Handle "profiles" commands - "create", "update", "remove", "get" and "list"
@@ -498,9 +486,11 @@ def load_config(config_file):
     config = {
         "device_id": "",
         "device_token": "",
+        "device_refresh_token": "",
         "role_id": "",
         "user_id": "",
         "user_token": "",
+        "user_refresh_token": "",
         "selected_study": "",
         "last_measurement": "",
         "study_cfg_hash": "",
@@ -513,9 +503,11 @@ def load_config(config_file):
 
     dfxapi.Settings.device_id = config["device_id"]
     dfxapi.Settings.device_token = config["device_token"]
+    dfxapi.Settings.device_refresh_token = config["device_refresh_token"]
     dfxapi.Settings.role_id = config["role_id"]
-    dfxapi.Settings.role_id = config["role_id"]
+    dfxapi.Settings.user_id = config["user_id"]
     dfxapi.Settings.user_token = config["user_token"]
+    dfxapi.Settings.user_refresh_token = config["user_refresh_token"]
     if "rest_url" in config and config["rest_url"]:
         dfxapi.Settings.rest_url = config["rest_url"]
     if "ws_url" in config and config["ws_url"]:
@@ -548,19 +540,24 @@ async def register(config, license_key):
         print("Already registered")
         return False
 
-    async with aiohttp.ClientSession() as session:
-        status, body = await dfxapi.Organizations.register_license(session, license_key, "LINUX", "DFX Example",
-                                                                   "DFXCLIENT", "0.0.1")
-        if status < 400:
+    try:
+        async with aiohttp.ClientSession(raise_for_status=True) as session:
+            await dfxapi.Organizations.register_license(session, license_key, "LINUX", "DFX Example", "DFXCLIENT",
+                                                        "0.0.1")
             config["device_id"] = dfxapi.Settings.device_id
             config["device_token"] = dfxapi.Settings.device_token
+            config["device_refresh_token"] = dfxapi.Settings.device_refresh_token
             config["role_id"] = dfxapi.Settings.role_id
-            config["user_token"] = dfxapi.Settings.user_token
+
+            # The following need to be cleared since we make measurements and user/device tokens are linked
+            config["user_token"] = dfxapi.Settings.user_token = ""
+            config["user_refresh_token"] = dfxapi.Settings.user_refresh_token = ""
+
             print(f"Register successful with new device id {config['device_id']}")
-            return True
-        else:
-            print(f"Register failed {status}: {body}")
-            return False
+        return True
+    except aiohttp.ClientResponseError as e:
+        print(f"Register failed: {e}")
+        return False
 
 
 async def unregister(config):
@@ -571,11 +568,17 @@ async def unregister(config):
     headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
     async with aiohttp.ClientSession(headers=headers) as session:
         status, body = await dfxapi.Organizations.unregister_license(session)
-        if status < 400:
+        if status < 400 or status == 401 and body["Code"] == "TOKEN_EXPIRED":
             print(f"Unregister successful for device id {config['device_id']}")
             config["device_id"] = ""
             config["device_token"] = ""
+            config["device_refresh_token"] = ""
             config["role_id"] = ""
+
+            # The following need to be cleared since we make measurements and user/device tokens are linked
+            config["user_token"] = dfxapi.Settings.user_token = ""
+            config["user_refresh_token"] = dfxapi.Settings.user_refresh_token = ""
+
             return True
         else:
             print(f"Unregister failed {status}: {body}")
@@ -595,6 +598,8 @@ async def login(config, email, password):
         status, body = await dfxapi.Users.login(session, email, password)
         if status < 400:
             config["user_token"] = dfxapi.Settings.user_token
+            config["user_refresh_token"] = dfxapi.Settings.user_refresh_token
+
             print("Login successful")
             return True
         else:
@@ -611,9 +616,75 @@ async def logout(config):
     async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
         await dfxapi.Users.logout(session)
         config["user_token"] = dfxapi.Settings.user_token
+        config["user_refresh_token"] = dfxapi.Settings.user_refresh_token
         config["user_id"] = ""
         print("Logout successful")
         return True
+
+
+async def verify_renew_token(config):
+    # Use the token to create the headers
+    if dfxapi.Settings.user_token:
+        headers = {"Authorization": f"Bearer {dfxapi.Settings.user_token}"}
+        using_user_token = True
+    else:
+        headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
+        using_user_token = False
+
+    # Verify that our token is still valid and renew if it's not
+    async with aiohttp.ClientSession(headers=headers, raise_for_status=False) as session:
+        status, body = await dfxapi.General.verify_token(session)
+        if status < 400:
+            return True, False, headers, None
+
+        # It's not valid, so attempt to renew it...
+        if using_user_token:
+            renew_status, renew_body = await dfxapi.Auths.renew_user_token(session)
+        else:
+            renew_status, renew_body = await dfxapi.Auths.renew_device_token(session)
+
+        # Renew failed
+        if renew_status >= 400:
+            # Show error from verify_token failure
+            print(f"Your {'user' if using_user_token else 'device'} token could not be verified.")
+            PP.print_pretty(body)
+
+            # Show error from renew_token failure
+            print("Attempted token refresh but failed, please register and/or login again!")
+            PP.print_pretty(renew_body)
+
+            # Erase saved tokens
+            if using_user_token:
+                config["user_token"] = ""
+                config["user_refresh_token"] = ""
+            else:
+                config["device_id"] = ""
+                config["device_token"] = ""
+                config["device_refresh_token"] = ""
+                config["role_id"] = ""
+                config["user_id"] = ""
+
+            # Exit since we cannot continue
+            return False, False, None, config
+
+        # Renew worked, so save new tokens
+        if using_user_token:
+            config["user_token"] = dfxapi.Settings.user_token
+            config["user_refresh_token"] = dfxapi.Settings.user_refresh_token
+
+            # Adjust headers
+            headers = {"Authorization": f"Bearer {dfxapi.Settings.user_token}"}
+        else:
+            config["device_token"] = dfxapi.Settings.device_token
+            config["device_refresh_token"] = dfxapi.Settings.device_refresh_token
+
+            # Adjust headers
+            headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
+
+        # Continue
+        print("Refreshed token. Continuing with command...")
+
+        return False, True, headers, config
 
 
 async def retrieve_sdk_config(headers, config, config_file, sdk_id):
