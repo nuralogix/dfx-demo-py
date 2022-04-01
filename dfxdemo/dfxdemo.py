@@ -92,7 +92,8 @@ async def main(args):
         return
 
     # Verify and if necessary, attempt to renew the token
-    verified, renewed, headers, new_config = await verify_renew_token(config)
+    using_user_token = bool(dfxapi.Settings.user_token)
+    verified, renewed, headers, new_config = await verify_renew_token(config, using_user_token)
     if not verified:
         save_config(new_config, args.config_file)
         if not renewed:
@@ -565,7 +566,11 @@ async def unregister(config):
         print("Not registered")
         return False
 
-    headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
+    verified, renewed, headers, _ = await verify_renew_token(config, False)
+    if not (verified or renewed):
+        print("Unregister failed. Could not verify or renew token.")
+        return False
+
     async with aiohttp.ClientSession(headers=headers) as session:
         status, body = await dfxapi.Organizations.unregister_license(session)
         if status < 400 or status == 401 and body["Code"] == "TOKEN_EXPIRED":
@@ -582,6 +587,7 @@ async def unregister(config):
             return True
         else:
             print(f"Unregister failed {status}: {body}")
+            return False
 
 
 async def login(config, email, password):
@@ -622,14 +628,13 @@ async def logout(config):
         return True
 
 
-async def verify_renew_token(config):
+async def verify_renew_token(config, using_user_token):
+    token_type = 'user' if using_user_token else 'device'
     # Use the token to create the headers
-    if dfxapi.Settings.user_token:
+    if using_user_token:
         headers = {"Authorization": f"Bearer {dfxapi.Settings.user_token}"}
-        using_user_token = True
     else:
         headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
-        using_user_token = False
 
     # Verify that our token is still valid and renew if it's not
     async with aiohttp.ClientSession(headers=headers, raise_for_status=False) as session:
@@ -646,11 +651,11 @@ async def verify_renew_token(config):
         # Renew failed
         if renew_status >= 400:
             # Show error from verify_token failure
-            print(f"Your {'user' if using_user_token else 'device'} token could not be verified.")
+            print(f"Your {token_type} token could not be verified.")
             PP.print_pretty(body)
 
             # Show error from renew_token failure
-            print("Attempted token refresh but failed, please register and/or login again!")
+            print(f"Attempted {token_type} token refresh but failed, please register and/or login again!")
             PP.print_pretty(renew_body)
 
             # Erase saved tokens
