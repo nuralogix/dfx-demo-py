@@ -76,6 +76,8 @@ dependencies.) This may take a while as [Dlib](http://dlib.net/) gets compiled.
 pip install -e ".[dlib]"
 ```
 
+Please download and unzip the [Dlib face landmarks dat file](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2) into the 'res' folder.
+
 ## Run `dfxdemo`
 
 `dfxdemo` has top-level commands that roughly correspond to the way the DFX API
@@ -93,6 +95,8 @@ dfxdemo org register <your_license_key>
 
 **Note**: By default, the demo stores tokens in a file called `config.json`.
 *In a production application, you will need to manage all tokens securely.*
+
+If org registration fails, please check the number of registered devices in DeepAffex™ dashboard and ensure that you have not reached the registered devices limit.
 
 ### Login
 
