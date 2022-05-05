@@ -1,7 +1,7 @@
 # `dfxdemo`
 
 `dfxdemo` is a simple Python-based demo that demonstrates how to use the
-DeepAffex™ Extraction SDK and DeepAffex™ Cloud API.
+DeepAffex™ Extraction Library and DeepAffex™ Cloud API.
 
 The demo can extract facial blood-flow from a video file or from a webcam, send
 it to the DeepAffex™ Cloud for processing and display the results. (This
@@ -62,7 +62,8 @@ upgrade `pip`
   python -m pip install --upgrade wheel cmake
   ```
 
-Download the [Python wheel for the DFX SDK](https://deepaffex.ai/developers-sdk)
+Download the
+[Python wheel for the DeepAffex™ Extraction Library](https://deepaffex.ai/developers-sdk)
 for your platform and install it in the Python virtual environment.
 
 ```shell
@@ -215,7 +216,7 @@ docker build . -t dfxdemo --build-arg EXTRAS_REQUIRE=dummy
 ## Additional resources
 
 * [Developers Guide](http://docs.deepaffex.ai/guide/index.html)
-* [SDK](https://deepaffex.ai/developers-sdk)
+* [DeepAffex™ Extraction Library](https://deepaffex.ai/developers-sdk)
   * [C++ Docs](http://docs.deepaffex.ai/c/index.html)
   * [Python Docs](http://docs.deepaffex.ai/python/index.html) **TODO**
   * [.NET Docs](http://docs.deepaffex.ai/dotnet/index.html)
