@@ -1,16 +1,9 @@
-#This file updated on 21 jul 2022 to include bollinger filtering
-#Updated on 25 jul 2022 to include Kalman filtering
-#updated 28 jul 2022 to improve kalman filtering
-#updated 29 jul 2022 to allow for filter type choice from call
-
-
 import multiprocessing as mp
 import os
 import queue
 from statistics import median
 from statistics import pstdev 
 from statistics import mean
-from numpy import dot
 import math
 
 import dlib
@@ -79,6 +72,7 @@ class DlibTracker():
     def trackFaces(self, image, frameNumber, timeStamp_ms, searchRect=None, desiredAttributes=None):
         x, y, w, h = self._sanitizeRoi(image.shape, searchRect)
         searchImage = image[y:y + h, x:x + w]
+        self._kalmanFrames = frameNumber #frame number is used in kalman tracking heuristic frequency
 
         if self._fd_fast:
             try:
@@ -150,11 +144,6 @@ class DlibTracker():
 
         return smoothedx, smoothedy
 
-    def _frameCount( self ):
-        #probably a better implementation, using this for now to track how many frames have gone by
-        if self._sampleNo % 68 == 0:
-            self._kalmanFrames +=1
-
     def _kalmanFilter( self, newx, newy, pointname, A= 1.0, C = 1.0 ):
         '''
         the procNoiseCov constant determines the ratio of tracking/filtering
@@ -165,9 +154,10 @@ class DlibTracker():
         if the subject is near the prediction, the noise cov should be lowered to eliminate outliers
         '''
         procNoiseCov = self._procNoiseCov
-
+        ''' 
         self._sampleNo +=1 #keep track of number of samples, in dlib 68pts are sampled per frame
-        self._frameCount() #update which frame we're on, every 68 frames +=1
+        self._frameCount() #update which frame we're on
+        '''
 
         eye = np.identity(1)
 
@@ -190,22 +180,22 @@ class DlibTracker():
             return xPrev,yPrev
 
         #based prediction, adjusted by proc covariance; if high subject is moving, if low subject is still
-        xP, yP = float(dot( A, xP ) + procNoiseCov), float(dot( A, yP ) + procNoiseCov)
+        xP, yP = float(np.dot( A, xP ) + procNoiseCov), float(np.dot( A, yP ) + procNoiseCov)
         
         #innovation step
         xDist, yDist = (newx - C*xPrev), (newy - C*yPrev)
-        xErr,yErr = ( dot( C, xP ) + xNoiseCov ),( dot( C, yP ) + yNoiseCov )
+        xErr,yErr = ( np.dot( C, xP ) + xNoiseCov ),( np.dot( C, yP ) + yNoiseCov )
         xApprox,yApprox = ( abs(xDist)/xErr ), ( abs(yDist)/yErr )
         xWeighted,yWeighted = ( 1/(1+(math.exp(-xApprox) + 0.1)) ), ( 1/(1+(math.exp(-yApprox) + 0.1)) )
         xNoiseCov, yNoiseCov = [4*xWeighted], [4*yWeighted]
 
         #calculate new Kalman Gain
-        xK, yK = ( dot( xP, dot(1, 1/xErr) ) ), ( dot( yP, dot(1, 1/yErr) ) )
+        xK, yK = ( np.dot( xP, np.dot(1, 1/xErr) ) ), ( np.dot( yP, np.dot(1, 1/yErr) ) )
         #update step
-        xFiltered, yFiltered = (float(xPrev + dot(xK, dot(xDist,xK)))), (float(yPrev + dot(yK, dot(yDist,yK))))
-        xP,yP = ( int(dot(eye - dot(xK,C), xP))), ( int(dot(eye - dot(yK,C), yP)))
+        xFiltered, yFiltered = (float(xPrev + np.dot(xK, np.dot(xDist,xK)))), (float(yPrev + np.dot(yK, np.dot(yDist,yK))))
+        xP,yP = ( int(np.dot(eye - np.dot(xK,C), xP))), ( int(np.dot(eye - np.dot(yK,C), yP)))
 
-        #on every other frame update the proc covariance coeff
+        #on every other frame update the proc covariance coeff (frequency of covariance update can be adjusted)
         if self._kalmanFrames % 2 == 0:
             self._updateProcNoise()
 
@@ -238,10 +228,6 @@ class DlibTracker():
         newCoeff = ( np.arctan( scalingSpeed*currDist - hScale))/vScale + vShift
                                                                                  # update the new covariance
         self._procNoiseCov = newCoeff
-                                                                                 # debug tracing
-        '''
-        print((currDist,newCoeff))
-        '''
 
     def _bollingerFilter( self, newx, newy, pointname, bound = 0.9, buffer = 10 ):
         #pull the pt arrays
