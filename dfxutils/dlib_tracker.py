@@ -209,11 +209,11 @@ class DlibTracker():
 
         return xFiltered,yFiltered
 
-    def _updateProcNoise( self, scalingSpeed = 1, vScale = 0.81, vShift = 1.3, hScale = 1.7 ):
+    def _updateProcNoise( self, scalingSpeed = 0.5, vScale = 0.81, vShift = 1.3, hShift = 1.7 ):
         #gets mean of current distance from all points in prediction vs actual
 
         '''
-        hScale value sets the expected average distance
+        hShift value sets the expected average distance
         vScale value sets where the covariance should be at the expected average
         scalingSpeed value sets how aggressively the output approaches the bounds
         vScale sets the height of the bounds (be wary of allowing for negative covariance)
@@ -225,7 +225,7 @@ class DlibTracker():
         xDist, yDist = ( xDist/(i+1) ),( yDist/(i+1) )                           # get the mean distance
         currDist = math.sqrt( xDist**2 + yDist**2 )                              # current distance modulus
                                                                                  # bound coeff by atan function
-        newCoeff = ( np.arctan( scalingSpeed*currDist - hScale))/vScale + vShift
+        newCoeff = ( np.arctan( scalingSpeed*currDist - hShift))/vScale + vShift
                                                                                  # update the new covariance
         self._procNoiseCov = newCoeff
 
