@@ -1,4 +1,3 @@
-#updated 29 july 2022 to allow for filter choices args
 import argparse
 import asyncio
 import base64

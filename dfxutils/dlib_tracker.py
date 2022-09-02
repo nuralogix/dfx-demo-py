@@ -209,7 +209,7 @@ class DlibTracker():
 
         return xFiltered,yFiltered
 
-    def _updateProcNoise( self, scalingSpeed = 0.5, vScale = 0.81, vShift = 1.3, hShift = 1.7 ):
+    def _updateProcNoise( self, scalingSpeed = 0.54333, vScale = 0.94444, vShift = 0.5, hShift = 1.07777 ):
         #gets mean of current distance from all points in prediction vs actual
 
         '''
