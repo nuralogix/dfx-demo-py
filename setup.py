@@ -2,12 +2,12 @@ from setuptools import setup, find_packages
 
 setup(
     name='dfxdemo',
-    version='0.14.0',
+    version='0.15.0',
     packages=find_packages(),
     install_requires=[
-        'dfx-apiv2-client @ https://github.com/nuralogix/dfx-apiv2-client-py/tarball/master',
+        'dfx-apiv2-client<=0.10',
         'libdfx>=4.9',
-        'opencv-python>=4.5,<4.6'
+        'opencv-python>=4.5,<4.7'
     ],
     extras_require={
         "dlib": ["dlib>=19,!=19.22,!=19.22.1"],
