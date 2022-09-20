@@ -107,3 +107,13 @@ class DfxSdkHelpers:
 
         def __str__(self) -> str:
             return json.dumps(self.__dict__)
+
+    #Method to create a clean dictionary for rendering and printing
+    @staticmethod
+    def result_to_cleaned_dict(result: str):
+        clean_result={}
+        clean_result["chunk_number"]=result["chunk_number"]
+        for k, v in result["Channels"].items():
+            clean_result.update({k:(result["Channels"][k]["Data"][0])/10000})
+        print(clean_result)    
+        return clean_result
