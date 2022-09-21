@@ -436,11 +436,10 @@ async def main(args):
                 async for msg in ws:
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
                     if request_id == results_request_id:
-                        result=json.loads(payload)
-                        result["chunk_number"]=int(result['MeasurementDataID'].split(':')[-1])
-                        clean_result=DfxSdkHelpers.result_to_cleaned_dict(result)
-                        renderer.set_results(clean_result.copy())
-                        PP.print_sdk_result(clean_result)
+                        json_result=json.loads(payload)
+                        result=DfxSdkHelpers.json_result_to_dict(json_result)
+                        renderer.set_results(result.copy())
+                        PP.print_sdk_result(result)
                         num_results_received += 1
                     # We are done if the last chunk is sent and number of results received equals number of chunks sent
                     if app.last_chunk_sent and num_results_received == app.number_chunks_sent:

@@ -110,10 +110,12 @@ class DfxSdkHelpers:
 
     #Method to create a clean dictionary for rendering and printing
     @staticmethod
-    def result_to_cleaned_dict(result: str):
+    def json_result_to_dict(json_result: dict) -> dict:
         clean_result={}
-        clean_result["chunk_number"]=result["chunk_number"]
-        for k, v in result["Channels"].items():
-            clean_result.update({k:(result["Channels"][k]["Data"][0])/10000})
-        print(clean_result)    
+        clean_result["chunk_number"]=int(json_result['MeasurementDataID'].split(':')[-1])
+        for k,v in json_result["Channels"].items():
+            if (len( json_result["Channels"][k]["Data"]) > 0 and json_result["Multiplier"] > 0):                
+                clean_result.update({k:(json_result["Channels"][k]["Data"][0])/json_result["Multiplier"]})
+            else:
+                clean_result.update({k:"Invalid result received"})  
         return clean_result
