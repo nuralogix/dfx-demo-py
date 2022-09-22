@@ -84,7 +84,7 @@ class PrettyPrinter():
             elif type(item) == dict:
                 PrettyPrinter._print_dict(item, csv, indent + 2)
             else:
-                print(indent * " " + item)
+                print(indent * " " + f"{item}")
 
     @staticmethod
     def _print_list_of_dicts(list_of_dicts, csv, indent):

@@ -120,7 +120,7 @@ class DfxSdkHelpers:
             return result
 
         multiplier = float(json_result["Multiplier"])
-        for k, v in json_result["Channels"].items():
+        for k, v in sorted(json_result["Channels"].items()):
             data_values = v["Data"]
             if (len(data_values) > 0):
                 result.update({k: (sum(data_values) / len(data_values)) / multiplier})
