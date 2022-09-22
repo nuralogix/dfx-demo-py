@@ -436,8 +436,8 @@ async def main(args):
                 async for msg in ws:
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
                     if request_id == results_request_id:
-                        json_result=json.loads(payload)
-                        result=DfxSdkHelpers.json_result_to_dict(json_result)
+                        json_result = json.loads(payload)
+                        result = DfxSdkHelpers.json_result_to_dict(json_result)
                         renderer.set_results(result.copy())
                         PP.print_sdk_result(result)
                         num_results_received += 1
