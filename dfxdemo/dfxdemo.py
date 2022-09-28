@@ -356,7 +356,7 @@ async def main(args):
         print(f"Created measurement {app.measurement_id}")
 
         # Use the session to connect to the WebSocket
-        async with session.ws_connect(dfxapi.Settings.ws_url) as ws:
+        async with dfxapi.Measurements.ws_connect(session) as ws:
             # Auth using `ws_auth_with_token` if headers cannot be manipulated, normally you don't need to do this
             # if "Authorization" not in session.headers:
             #     await dfxapi.Organizations.ws_auth_with_token(ws, generate_reqid())
@@ -436,8 +436,8 @@ async def main(args):
                 async for msg in ws:
                     status, request_id, payload = dfxapi.Measurements.ws_decode(msg)
                     if request_id == results_request_id:
-                        sdk_result = collector.decodeMeasurementResult(payload)
-                        result = DfxSdkHelpers.sdk_result_to_dict(sdk_result)
+                        json_result = json.loads(payload)
+                        result = DfxSdkHelpers.json_result_to_dict(json_result)
                         renderer.set_results(result.copy())
                         PP.print_sdk_result(result)
                         num_results_received += 1

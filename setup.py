@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name='dfxdemo',
-    version='0.15.0',
+    version='0.16.0',
     packages=find_packages(),
     install_requires=[
-        'dfx-apiv2-client<=0.10',
+        'dfx-apiv2-client>0.10,<=0.11',
         'libdfx>=4.9',
         'opencv-python>=4.5,<4.7'
     ],
