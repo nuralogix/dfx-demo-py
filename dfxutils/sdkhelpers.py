@@ -111,7 +111,8 @@ class DfxSdkHelpers:
     @staticmethod
     def json_result_to_dict(json_result: dict) -> dict:
         result = {
-            "chunk_number": int(json_result['MeasurementDataID'].split(':')[-1]),
+            "chunk_number":
+            int(json_result['MeasurementDataID'].split(':')[-1]) if 'MeasurementDataID' in json_result else None,
             "Status": json_result["Error"]["Code"],
             "Errors": json_result["Error"]["Errors"] if "Errors" in json_result["Error"] else None,
         }

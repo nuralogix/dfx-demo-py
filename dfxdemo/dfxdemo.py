@@ -439,7 +439,7 @@ async def main(args):
                         json_result = json.loads(payload)
                         result = DfxSdkHelpers.json_result_to_dict(json_result)
                         renderer.set_results(result.copy())
-                        PP.print_sdk_result(result)
+                        print(payload) if args.json else PP.print_sdk_result(result)
                         num_results_received += 1
                     # We are done if the last chunk is sent and number of results received equals number of chunks sent
                     if app.last_chunk_sent and num_results_received == app.number_chunks_sent:
@@ -475,6 +475,7 @@ async def main(args):
                     e = d.exception()
                     if e is not None and type(e) != asyncio.CancelledError:
                         print(e)
+                        # raise e  # Uncomment this to see a stack trace
                 print(f"Measurement {app.measurement_id} failed")
             else:
                 config["last_measurement"] = app.measurement_id
@@ -1028,10 +1029,6 @@ def cmdline():
     mk_ch_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=None)
     mk_ch_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
     mk_ch_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
-    mk_ch_parser.add_argument("-dg",
-                              "--demographics",
-                              help="Path to JSON file containing user demographics",
-                              default=None)
     mk_ch_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
     args = parser.parse_args()
 
