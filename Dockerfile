@@ -30,7 +30,7 @@ RUN sed -i "s/opencv-python/opencv-python-headless/" setup.py
 
 # Install everything into the venv
 RUN pip install wheel --no-cache-dir --disable-pip-version-check && \
-    pip install .[${EXTRAS_REQUIRE}] --disable-pip-version-check --no-cache-dir --use-feature=in-tree-build --find-links /wheel
+    pip install .[${EXTRAS_REQUIRE}] --disable-pip-version-check --no-cache-dir --find-links /wheel
 
 ## Stage 2
 FROM python:3.10-slim-bullseye
