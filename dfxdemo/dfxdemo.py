@@ -215,7 +215,7 @@ async def main(args):
                                         use_analyser=args.analyser,
                                         track_in_background=app.is_camera)
             else:
-                tracker = DlibTracker()
+                tracker = DlibTracker(smoothing = args.dlib_smoothing)
 
             # Create DFX SDK factory
             factory = dfxsdk.Factory()
@@ -245,6 +245,7 @@ async def main(args):
             return
 
         print(f"Face Tracker: {args.face_tracker}")
+        print(f"Smoothing Type: {args.dlib_smoothing}")
         print("Created DFX Collector:")
         chunk_duration_s = float(args.chunk_duration_s)
         frames_per_chunk = math.ceil(chunk_duration_s * imreader.fps)
@@ -964,6 +965,12 @@ def cmdline():
                                      help="Use Visage Face Analyser module",
                                      action="store_true",
                                      default=False)
+        if "dlib" in FT_CHOICES:
+            make_parser.add_argument("-ds",
+                                     "--dlib_smoothing",
+                                     help="Smoothing algorithm to use with Dlib",
+                                     default="median",
+                                     choices=["median", "kalman", "bollinger"])
     if FT_CHOICES and not cv2.version.headless:
         camera_parser = subparser_meas.add_parser("make_camera", help="Make a measurement from a camera")
         camera_parser.add_argument("--camera", help="Camera ID", type=int, default=0)
@@ -1008,6 +1015,12 @@ def cmdline():
                                        action="store_true",
                                        default=False)
 
+        if "dlib" in FT_CHOICES:
+            camera_parser.add_argument("-ds",
+                                     "--dlib_smoothing",
+                                     help="Smoothing algorithm to use with Dlib",
+                                     default="median",
+                                     choices=["median", "kalman", "bollinger"])
     mk_ch_parser = subparser_meas.add_parser("debug_make_from_chunks",
                                              help="Make a measurement from saved SDK chunks (debugging)")
     mk_ch_parser.add_argument("debug_chunks_folder", help="Folder containing SDK chunks", type=str)

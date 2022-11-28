@@ -145,3 +145,5 @@ creds.json
 **/res/
 !**/res/README.txt
 !wheels/README.txt
+# remove DS_Store from macos filesystems
+.DS_Store
