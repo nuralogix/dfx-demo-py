@@ -120,6 +120,7 @@ class DfxSdkHelpers:
         if "Channels" not in json_result:
             return result
 
+        notes = {}
         multiplier = float(json_result["Multiplier"])
         for k, v in sorted(json_result["Channels"].items()):
             data_values = v["Data"]
@@ -127,4 +128,9 @@ class DfxSdkHelpers:
                 result.update({k: (sum(data_values) / len(data_values)) / multiplier})
             else:
                 result.update({k: None})
+            if "Notes" in v:
+                notes[k] = v["Notes"]
+        if len(notes) > 0:
+            result["Notes"] = notes
+
         return result
