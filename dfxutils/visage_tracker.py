@@ -27,8 +27,8 @@ class VisageTracker():
         self._visage_initialized = False
         self._track_in_background = track_in_background
         self._visage_init_params = visageLicense, use_analyser, maxFaces, frameWidth, frameHeight
+        self._last_tracked_faces = {}
         if self._track_in_background:
-            self._last_tracked_faces = {}
             self._work_queue = mp.Queue(1)
             self._results_queue = mp.Queue(1)
             self._track_proc = mp.Process(target=self._trackFacesThreaded, name="visage_tracker")

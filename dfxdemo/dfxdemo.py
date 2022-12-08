@@ -31,6 +31,12 @@ except ImportError:
     pass
 
 try:
+    from dfxutils.mediapipe_tracker import MediaPipeTracker
+    FT_CHOICES.append("mediapipe")
+except ImportError:
+    pass
+
+try:
     from dfxutils.dlib_tracker import DlibTracker
     FT_CHOICES.append("dlib")
 except ImportError:
@@ -214,8 +220,10 @@ async def main(args):
                                         imreader.height,
                                         use_analyser=args.analyser,
                                         track_in_background=app.is_camera)
-            else:
+            elif args.face_tracker == "dlib":
                 tracker = DlibTracker()
+            else:
+                tracker = MediaPipeTracker(1, track_in_background=app.is_camera)
 
             # Create DFX SDK factory
             factory = dfxsdk.Factory()
