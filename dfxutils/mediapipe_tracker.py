@@ -1,5 +1,5 @@
 #
-#              Copyright (c) 2016-2021, Nuralogix Corp.
+#              Copyright (c) 2022, Nuralogix Corp.
 #                      All Rights reserved
 #
 #      THIS SOFTWARE IS LICENSED BY AND IS THE CONFIDENTIAL AND
