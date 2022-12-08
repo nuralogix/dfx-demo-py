@@ -49,6 +49,9 @@ class MediaPipeTracker():
 
         results = self._face_mesh.process(image)
 
+        if not results.multi_face_landmarks:
+            return faces
+
         for faceNumber, face in enumerate(results.multi_face_landmarks):
             tlx, tly, brx, bry = self._findBoundingBox(image.shape, face.landmark, 0.05)
             faces[str(faceNumber + 1)] = {
