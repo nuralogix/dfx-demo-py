@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install --no-install-recommends --yes libatomic1
 ARG EXTRAS_REQUIRE
 RUN bash -c 'if [[ ${EXTRAS_REQUIRE} == *"dlib"* ]]; then apt-get install --no-install-recommends --yes libopenblas0 liblapack3; fi'
 RUN bash -c 'if [[ ${EXTRAS_REQUIRE} == *"visage"* ]]; then apt-get install --no-install-recommends --yes libgomp1; fi'
+RUN bash -c 'if [[ ${EXTRAS_REQUIRE} == *"mediapipe"* ]]; then apt-get install --no-install-recommends --yes libgl1 libglib2.0-0; fi'
 
 # Copy venv from previous stage and activate it
 ENV VENV=/opt/venv
