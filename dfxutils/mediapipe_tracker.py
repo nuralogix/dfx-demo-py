@@ -44,6 +44,20 @@ class MediaPipeTracker():
                                                                  min_tracking_confidence=min_track_conf)
         self._mediapipe_initialized = True
 
+    def _trackFacesThreaded(self):
+        maxFaces, refine_landmarks, min_det_conf, min_track_conf = self._init_params
+        self._initializeMediaPipe(maxFaces, refine_landmarks, min_det_conf, min_track_conf)
+
+        while True:
+            image, frameNumber, timeStamp_ms = self._work_queue.get()
+            if image is None:
+                break
+            tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
+            try:
+                self._results_queue.put_nowait(tracked_faces)
+            except queue.Full:
+                pass
+
     def trackFaces(self, image, frameNumber, timeStamp_ms):
         if self._track_in_background:
             try:
@@ -63,20 +77,6 @@ class MediaPipeTracker():
             self._last_tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
 
         return self._last_tracked_faces
-
-    def _trackFacesThreaded(self):
-        maxFaces, refine_landmarks, min_det_conf, min_track_conf = self._init_params
-        self._initializeMediaPipe(maxFaces, refine_landmarks, min_det_conf, min_track_conf)
-
-        while True:
-            image, frameNumber, timeStamp_ms = self._work_queue.get()
-            if image is None:
-                break
-            tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
-            try:
-                self._results_queue.put_nowait(tracked_faces)
-            except queue.Full:
-                pass
 
     def _trackFaces(self, bgrImage, _frameNumber, _timeStamp_ms):
         faces = {}
@@ -201,7 +201,11 @@ class MediaPipeTracker():
         return faces
 
     def stop(self):
-        pass
+        if self._track_in_background and self._track_proc and self._track_proc.is_alive():
+            self._work_queue.put(None)
+            self._track_proc.terminate()
+            self._work_queue.cancel_join_thread()
+            self._results_queue.cancel_join_thread()
 
     def _findBoundingBox(self, imageShape, landmarks, expand):
         tlx, tly, brx, bry = (imageShape[1], imageShape[0], 0, 0)
