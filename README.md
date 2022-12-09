@@ -26,60 +26,42 @@ license and copy and save it locally. (You will need it for registering later.)
 
 Please ensure you have the following software installed:
 
-* [Python 3.7 or newer (64-bit)](https://www.python.org/)
+* [Python 3.8 or newer (64-bit)](https://www.python.org/)
 * [Git](https://git-scm.com/)
-* C++ compiler and toolchain, capable of compiling Python extensions:
-  * Windows: [Visual Studio 2017 or newer](https://visualstudio.microsoft.com/)
-  * macOS (untested): [Xcode](https://developer.apple.com/xcode/)
-  * Linux: gcc
-
-  Note: On Ubuntu 18.04, the following commands should work
-
-  ```shell
-  sudo apt-get install build-essential git # Compiler and Git
-  sudo apt-get install python3.8-dev python3.8-venv # or 3.7
-  sudo apt-get install libopenblas-dev liblapack-dev # for Dlib
-  ```
 
 Note: Please see the section [Using Docker](#using-docker) for an alternative.
 
 ## Install `dfxdemo`
 
-Clone the dfxdemo application from Github.
+Clone the `dfxdemo` application from Github.
 
 ```shell
 git clone https://github.com/nuralogix/dfx-demo-py
 ```
 
 Create a Python virtual environment inside the cloned repo, activate it and
-upgrade `pip`
+upgrade `pip`. (On Ubuntu, you may need to run
+`sudo apt-get install python3-venv` to enable venv support.)
 
-  ```shell
-  cd dfx-demo-py
-  python3 -m venv venv
-  source venv/bin/activate # on Windows: venv\Scripts\activate
-  python -m pip install --upgrade pip setuptools
-  python -m pip install --upgrade wheel cmake
-  ```
+```shell
+cd dfx-demo-py
+python3 -m venv venv     # on Windows: python -m venv venv
+source venv/bin/activate # on Windows: venv\Scripts\activate
+python -m pip install --upgrade pip setuptools wheel
+```
 
 Download the
 [Python wheel for the DeepAffex™ Extraction Library](https://deepaffex.ai/developers-sdk)
-for your platform and install it in the Python virtual environment.
-
-```shell
-pip install /path/to/download/libdfxpython.whl
-```
+for your platform to the `wheels/` folder.
 
 Install `dfxdemo` in editable mode (and automatically install other
-dependencies.) This may take a while as [Dlib](http://dlib.net/) gets compiled.
+dependencies.)
 
 ```shell
-pip install -e ".[dlib]"
+pip install -e ".[mediapipe]" -f wheels/
 ```
 
-Please download and unzip the
-[Dlib face landmarks dat file](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2)
-into the 'res' folder.
+Note: Please see the section [Using Dlib](#using-dlib) for an alternative.
 
 ## Run `dfxdemo`
 
@@ -163,6 +145,8 @@ List historical measurements
 dfxdemo measurements list
 ```
 
+---
+
 ## Additional instructions for developers in China
 
 If you intend to use the DeepAffex™ Cloud API in mainland China, please use the
@@ -170,11 +154,14 @@ the `--rest-url` option of the `dfxdemo org register` command as shown below:
 
 ## 中国大陆的开发者请注意
 
-如果您在中国大陆使用DeepAffex™云端API, 在使用`dfxdemo org register`命令时, 请使用`-rest-url`选项, 如下所示。
+如果您在中国大陆使用DeepAffex™云端API, 在使用`dfxdemo org register`命令时, 请使用`--rest-url`选项,
+如下所示。
 
 ```shell
 dfxdemo org register --rest-url https://api.deepaffex.cn/ <your_license_key>
 ```
+
+---
 
 ## Using Docker
 
@@ -202,7 +189,7 @@ In the commands below, please replace `${PWD}` with `%CD%` on Windows.
 docker run -it --rm -v ${PWD}:/app dfxdemo org register <your_license_key>
 
 # To run `measure make`, use this, updating /path/to/videos to a path on your machine...
-docker run -it --rm -v ${PWD}:/app -v /path/to/videos:/videos dfxdemo measure make /videos/video_file
+docker run -it --rm -v ${PWD}:/app -v /path/to/videos:/videos dfxdemo measure make /videos/video_file --headless
 ```
 
 ### Other options
@@ -212,6 +199,39 @@ If you don't need to make measurements, then you can build without a facetracker
 ```shell
 docker build . -t dfxdemo --build-arg EXTRAS_REQUIRE=dummy
 ```
+
+---
+
+## Using Dlib
+
+You can use [Dlib](http://dlib.net/) instead of
+[MediaPipe](https://mediapipe.dev/) as the face-tracker. Since Dlib doesn't
+distribute as pre-compiled Python wheels, you will need to install a C++
+compiler and toolchain, capable of compiling Python extensions. Depending upon
+your platform, please install:
+  * Windows: [Visual Studio 2019 or newer](https://visualstudio.microsoft.com/)
+  * macOS (untested): [Xcode](https://developer.apple.com/xcode/)
+  * Linux: gcc and Python development libraries
+
+  Note: On Ubuntu 22.04, the following commands should work
+
+```shell
+sudo apt-get install build-essential # Compiler and build tools
+sudo apt-get install python3-dev
+sudo apt-get install libopenblas-dev liblapack-dev # for Dlib
+```
+
+To install `dfxdemo` with Dlib, in your activated Python virtual environment,
+run:
+
+```shell
+pip install --upgrade cmake
+pip install -e ".[dlib]"
+```
+
+Please download and unzip the
+[Dlib face landmarks dat file](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2)
+into the 'res' folder.
 
 ## Additional resources
 

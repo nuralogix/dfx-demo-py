@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='dfxdemo',
-    version='0.17.1',
+    version='0.18.0',
     packages=find_packages(),
     install_requires=[
         'dfx-apiv2-client>=0.12,<0.13',
