@@ -18,6 +18,7 @@ import os
 import queue
 import pathlib
 
+import cv2
 import mediapipe
 
 
@@ -41,11 +42,15 @@ class MediaPipeTracker():
 
         return self._last_tracked_faces
 
-    def _trackFaces(self, image, _frameNumber, _timeStamp_ms):
+    def _trackFaces(self, bgrImage, _frameNumber, _timeStamp_ms):
         faces = {}
 
         if not self._mediapipe_initialized:
             return faces
+
+        # Convert to rgb
+        image = cv2.cvtColor(bgrImage, cv2.COLOR_BGR2RGB)
+        image.flags.writeable = False
 
         results = self._face_mesh.process(image)
 
