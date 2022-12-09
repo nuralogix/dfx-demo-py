@@ -166,7 +166,7 @@ class Renderer():
                 fps_now = 1000_000_000.0 / avg_delta
             else:
                 fps_now = self._fps
-            msg = f"{self._image_src_name}: {self._fps:.2f} fps | {fps_now:.2f} fps"
+            msg = f"{self._image_src_name}: {fps_now:.2f} fps (Expected {self._fps:.2f} fps)"
         r = self._draw_text(msg, render_image, (c, r))
 
         # Render the message
