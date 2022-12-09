@@ -14,33 +14,69 @@
 #
 
 import multiprocessing as mp
-import os
 import queue
-import pathlib
 
 import cv2
 import mediapipe
+import numpy as np
 
 
 class MediaPipeTracker():
 
-    def __init__(self, maxFaces, track_in_background=False) -> None:
+    def __init__(self, max_faces, track_in_background=False) -> None:
         self._mediapipe_initialized = False
         self._track_in_background = track_in_background
+        self._init_params = max_faces, True, 0.5, 0.5
         self._last_tracked_faces = {}
-        self._face_mesh = mediapipe.solutions.face_mesh.FaceMesh(max_num_faces=maxFaces,
-                                                                 refine_landmarks=True,
-                                                                 min_detection_confidence=0.5,
-                                                                 min_tracking_confidence=0.5)
+        if self._track_in_background:
+            self._work_queue = mp.Queue(1)
+            self._results_queue = mp.Queue(1)
+            self._track_proc = mp.Process(target=self._trackFacesThreaded, name="mediapipe_tracker")
+            self._track_proc.start()
+        else:
+            max_faces, refine_landmarks, min_det_conf, min_track_conf = self._init_params
+            self._initializeMediaPipe(max_faces, refine_landmarks, min_det_conf, min_track_conf)
+
+    def _initializeMediaPipe(self, max_faces, refine_landmarks, min_det_conf, min_track_conf):
+        self._face_mesh = mediapipe.solutions.face_mesh.FaceMesh(max_num_faces=max_faces,
+                                                                 refine_landmarks=refine_landmarks,
+                                                                 min_detection_confidence=min_det_conf,
+                                                                 min_tracking_confidence=min_track_conf)
         self._mediapipe_initialized = True
 
-    def __del__(self):
-        del self._face_mesh
-
     def trackFaces(self, image, frameNumber, timeStamp_ms):
-        self._last_tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
+        if self._track_in_background:
+            try:
+                self._work_queue.put_nowait((np.copy(image), frameNumber, timeStamp_ms))
+            except queue.Full:
+                pass
+
+            try:
+                self._last_tracked_faces = self._results_queue.get_nowait()
+            except queue.Empty:
+                pass
+
+            # Force face detection if the result was empty if using the "smart" strategy
+            if not self._last_tracked_faces:
+                self._last_tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
+        else:
+            self._last_tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
 
         return self._last_tracked_faces
+
+    def _trackFacesThreaded(self):
+        maxFaces, refine_landmarks, min_det_conf, min_track_conf = self._init_params
+        self._initializeMediaPipe(maxFaces, refine_landmarks, min_det_conf, min_track_conf)
+
+        while True:
+            image, frameNumber, timeStamp_ms = self._work_queue.get()
+            if image is None:
+                break
+            tracked_faces = self._trackFaces(image, frameNumber, timeStamp_ms)
+            try:
+                self._results_queue.put_nowait(tracked_faces)
+            except queue.Full:
+                pass
 
     def _trackFaces(self, bgrImage, _frameNumber, _timeStamp_ms):
         faces = {}
