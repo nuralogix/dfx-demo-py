@@ -31,22 +31,31 @@ class PrettyPrinter():
     def print_result(measurement_results, csv=False):
         if "Results" in measurement_results and measurement_results["Results"] is not None:
             grid_results = []
+            notes = {}
             for signal_id, signal_name in measurement_results["SignalNames"].items():
                 result_data = measurement_results["Results"][signal_id][0]
                 units = measurement_results["SignalUnits"][signal_id]
                 description = measurement_results["SignalDescriptions"][signal_id]
                 result_value = sum(result_data["Data"]) / len(result_data["Data"]) / result_data["Multiplier"] if len(
                     result_data["Data"]) > 0 and result_data["Multiplier"] > 0 else None
+                notes_present = None
+                if "Notes" in result_data and len(result_data["Notes"]) > 0:
+                    notes_present = "Yes"
+                    notes[signal_id] = ", ".join(note for note in (note.replace("NOTE_", "")
+                                                                   for note in result_data["Notes"]))
                 grid_result = {
                     "ID": signal_id,
                     "Name": signal_name,
                     "Value": result_value,
                     "Unit": units if units is not None else "",
+                    "Notes": notes_present,
                     "Category": measurement_results["SignalConfig"][signal_id]["category"],
                     "Description": description
                 }
                 grid_results.append(grid_result)
             measurement_results["Results"] = grid_results
+            if len(notes) > 0:
+                measurement_results["Notes"] = notes
             del measurement_results["SignalNames"]
             del measurement_results["SignalUnits"]
             del measurement_results["SignalDescriptions"]
