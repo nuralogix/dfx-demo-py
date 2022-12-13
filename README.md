@@ -176,7 +176,7 @@ below. There are a few limitations:
 ### Build the image
 
 ```shell
-docker build . -t dfxdemo --build-arg EXTRAS_REQUIRE=dlib
+docker build . -t dfxdemo --build-arg EXTRAS_REQUIRE=mediapipe
 docker image prune -f  # Optional
 ```
 
