@@ -25,12 +25,15 @@ COPY *.py ./
 COPY dfxdemo/*.py dfxdemo/
 COPY dfxutils/*.py dfxutils/
 
-# Switch to headless OpenCV
+# Switch to headless opencv
 RUN sed -i "s/opencv-python/opencv-python-headless/" setup.py
 
 # Install everything into the venv
 RUN pip install wheel --no-cache-dir --disable-pip-version-check && \
     pip install .[${EXTRAS_REQUIRE}] --disable-pip-version-check --no-cache-dir --find-links /wheel
+
+# Switch to headless opencv-contrib
+RUN bash -c 'if [[ ${EXTRAS_REQUIRE} == *"mediapipe"* ]]; then pip uninstall -y opencv-python-headless opencv-contrib-python && pip install opencv-contrib-python-headless; fi'
 
 ## Stage 2
 FROM python:3.10-slim-bullseye
