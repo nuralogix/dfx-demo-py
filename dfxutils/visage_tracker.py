@@ -147,6 +147,8 @@ class VisageTracker():
                         tly = p.scaledY if p.scaledY < tly else tly
                         brx = p.scaledX if p.scaledX > brx else brx
                         bry = p.scaledY if p.scaledY > bry else bry
+                # Ensure face rect within image
+                tlx, tly, brx, bry = max(tlx, 0), max(tly, 0), min(brx, image.shape[1]), min(bry, image.shape[0])
 
                 faces[str(faceNumber + 1)] = {
                     "id": str(faceNumber + 1),

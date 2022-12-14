@@ -276,10 +276,15 @@ class MediaPipeTracker():
             brx = scaledX if scaledX > brx else brx
             bry = scaledY if scaledY > bry else bry
 
+        # Expand bounding box
         dw = (brx - tlx) * expand
         dh = (bry - tly) * expand
+        tlx, tly, brx, bry = tlx - dw, tly - 2 * dh, brx + dw, bry
 
-        return (int(tlx - dw), int(tly - 2 * dh), int(brx + dw), int(bry))
+        # Ensure bounding box within image
+        tlx, tly, brx, bry = max(tlx, 0), max(tly, 0), min(brx, imageShape[1]), min(bry, imageShape[0])
+
+        return tlx, tly, brx, bry
 
     def _pipe2mpeg4(self, imageShape, landmarks, *indices):
         x, y, z = 0, 0, 0

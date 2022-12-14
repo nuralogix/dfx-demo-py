@@ -31,7 +31,9 @@ class DfxSdkHelpers:
     @staticmethod
     def dfx_face_from_json(collector: dfxsdk.Collector, json_face: dict) -> dfxsdk.Face:
         face = collector.createFace(json_face["id"])
-        face.setRect(json_face['rect.x'], json_face['rect.y'], json_face['rect.w'], json_face['rect.h'])
+        # Face rect needs integers
+        face.setRect(int(json_face['rect.x']), int(json_face['rect.y']), int(json_face['rect.w']),
+                     int(json_face['rect.h']))
         face.setPoseValid(json_face['poseValid'])
         face.setDetected(json_face['detected'])
         points = json_face['points']
