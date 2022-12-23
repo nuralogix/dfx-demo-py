@@ -87,7 +87,11 @@ limit.
 
 ### Login
 
-Login as a user to obtain a *user token*.
+Login as a user to get a *user token*. For the purposes of this demo, you need
+this step since a user token is necessary to list studies (the next section.) In
+a production app, you will likely use
+[Anonymous Measurements](https://docs.deepaffex.ai/guide/cloud/4_users.html#anonymous-measurements)
+with a fixed Study ID.
 
 ```shell
 dfxdemo user login <email> <password>
@@ -133,13 +137,13 @@ Make a measurement from a webcam using the selected study
 dfxdemo measure make_camera
 ```
 
-Retrieve detailed results of the last measurement
+Retrieve detailed results of the last measurement you made
 
 ```shell
 dfxdemo measure get
 ```
 
-List historical measurements
+List your historical measurements
 
 ```shell
 dfxdemo measurements list

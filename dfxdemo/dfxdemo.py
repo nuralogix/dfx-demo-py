@@ -70,16 +70,19 @@ async def main(args):
 
     # Handle various command line subcommands
 
-    # Handle "orgs" (Organizations) commands - "register" and "unregister"
+    # Handle "orgs" (Organizations) commands - "register", "unregister" and "login"
     if args.command in ["o", "org", "orgs"]:
-        if args.subcommand == "unregister":
-            success = await unregister(config)
-        else:
-            success = await register(config, args.license_key)
+        if args.subcommand in ["register", "unregister", "login"]:
+            if args.subcommand == "unregister":
+                success = await unregister(config)
+            elif args.subcommand == "register":
+                success = await register(config, args.license_key)
+            else:
+                success = await org_login(config, args.email, args.password, args.org_id)
 
-        if success:
-            save_config(config, args.config_file)
-        return
+            if success:
+                save_config(config, args.config_file)
+            return
 
     # Handle "users" commands - "login" and "logout"
     if args.command in ["u", "user", "users"]:
@@ -103,6 +106,23 @@ async def main(args):
     if not verified:
         save_config(new_config, args.config_file)
         if not renewed:
+            return
+
+    # Handle "orgs" (Organizations) commands - "list-measures" and "get-measure"
+    if args.command in ["o", "org", "orgs"]:
+        async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
+            if args.subcommand in ["get-measurement", "gm"]:
+                _, results = await dfxapi.Organizations.retrieve_measurement(session, args.measurement_id, args.expand)
+                print(json.dumps(results)) if args.json else PP.print_result(results, args.csv)
+            elif args.subcommand in ["list-measurements", "lm"]:
+                _, measurements = await dfxapi.Organizations.list_measurements(session,
+                                                                               limit=args.limit,
+                                                                               offset=args.offset,
+                                                                               user_profile_id=args.profile_id,
+                                                                               partner_id=args.partner_id,
+                                                                               study_id=args.study_id,
+                                                                               email=args.email)
+                print(json.dumps(measurements)) if args.json else PP.print_pretty(measurements, args.csv)
             return
 
     # Handle "profiles" commands - "create", "update", "remove", "get" and "list"
@@ -632,6 +652,24 @@ async def logout(config):
         return True
 
 
+async def org_login(config, email, password, org_id):
+    if dfxapi.Settings.user_token:
+        print("Already logged in")
+        return False
+
+    async with aiohttp.ClientSession() as session:
+        status, body = await dfxapi.Organizations.login(session, email, password, org_id)
+        if status < 400:
+            config["user_token"] = dfxapi.Settings.user_token
+            config["user_refresh_token"] = dfxapi.Settings.user_refresh_token
+
+            print("Login successful")
+            return True
+        else:
+            print(f"Login failed {status}: {body}")
+            return False
+
+
 async def verify_renew_token(config, using_user_token):
     token_type = 'user' if using_user_token else 'device'
     # Use the token to create the headers
@@ -859,6 +897,34 @@ def cmdline():
     register_parser.add_argument("license_key", help="DFX API Organization License")
     register_parser.add_argument("--rest-url", help="Connect to DFX API using this REST URL", default=None)
     unregister_parser = subparser_orgs.add_parser("unregister", help="Unregister device")
+    o_login_parser = subparser_orgs.add_parser("login", help="Adminstrative login (no measurements)")
+    o_login_parser.add_argument("org_id", help="Organization ID")
+    o_login_parser.add_argument("email", help="Email address")
+    o_login_parser.add_argument("password", help="Password")
+    o_list_parser = subparser_orgs.add_parser("list-measurements",
+                                              aliases=[
+                                                  "lm",
+                                              ],
+                                              help="List existing measurements across org")
+    o_list_parser.add_argument("--limit",
+                               help="Number of measurements to retrieve (default: 10, max: 50)",
+                               type=int,
+                               default=10)
+    o_list_parser.add_argument("--offset",
+                               help="Offset of the measurements to retrieve (default: 0)",
+                               type=int,
+                               default=0)
+    o_list_parser.add_argument("--profile_id", help="Filter list by Profile ID", type=str, default="")
+    o_list_parser.add_argument("--partner_id", help="Filter list by Partner ID", type=str, default="")
+    o_list_parser.add_argument("--study_id", help="Filter list by Study ID", type=str, default="")
+    o_list_parser.add_argument("--email", help="Filter list by Email", type=str, default="")
+    o_get_parser = subparser_orgs.add_parser("get-measurement",
+                                             aliases=[
+                                                 "gm",
+                                             ],
+                                             help="Retrieve a measurement across org")
+    o_get_parser.add_argument("measurement_id", help="ID of measurement to retrieve")
+    o_get_parser.add_argument("--expand", help="Retrieve vector results per signal", action="store_true", default=False)
 
     # users - login, logout
     subparser_users = subparser_top.add_parser("users", aliases=["u", "user"],
