@@ -78,7 +78,7 @@ async def main(args):
             elif args.subcommand == "register":
                 success = await register(config, args.license_key)
             else:
-                success = await org_login(config, args.email, args.password, args.org_id)
+                success = await org_login(config, args.email, args.password, args.org_key)
 
             if success:
                 save_config(config, args.config_file)
@@ -652,13 +652,13 @@ async def logout(config):
         return True
 
 
-async def org_login(config, email, password, org_id):
+async def org_login(config, email, password, org_key):
     if dfxapi.Settings.user_token:
         print("Already logged in")
         return False
 
     async with aiohttp.ClientSession() as session:
-        status, body = await dfxapi.Organizations.login(session, email, password, org_id)
+        status, body = await dfxapi.Organizations.login(session, email, password, org_key)
         if status < 400:
             config["user_token"] = dfxapi.Settings.user_token
             config["user_refresh_token"] = dfxapi.Settings.user_refresh_token
@@ -898,7 +898,7 @@ def cmdline():
     register_parser.add_argument("--rest-url", help="Connect to DFX API using this REST URL", default=None)
     unregister_parser = subparser_orgs.add_parser("unregister", help="Unregister device")
     o_login_parser = subparser_orgs.add_parser("login", help="Adminstrative login (no measurements)")
-    o_login_parser.add_argument("org_id", help="Organization ID")
+    o_login_parser.add_argument("org_key", help="Organization Key")
     o_login_parser.add_argument("email", help="Email address")
     o_login_parser.add_argument("password", help="Password")
     o_list_parser = subparser_orgs.add_parser("list-measurements",
