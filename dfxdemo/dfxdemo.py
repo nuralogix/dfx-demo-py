@@ -659,11 +659,11 @@ async def logout(config):
 
 async def org_login(config, email, password, org_key):
     if dfxapi.Settings.user_token:
-        print("Already logged in")
+        print("Already logged in. Please logout using 'user logout' or use a different config file")
         return False
 
     if dfxapi.Settings.device_token:
-        print("Device is registered. Please unregister or use a different config file to continue.")
+        print("Device is registered. Please unregister or use a different config file")
         return False
 
     async with aiohttp.ClientSession() as session:
