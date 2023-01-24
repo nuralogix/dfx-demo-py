@@ -190,12 +190,17 @@ async def main(args):
     assert args.command in ["m", "measure", "measurements"] and "make" in args.subcommand
 
     # Verify preconditions
-    # 1. Make sure a study is selected
+    # 1. Make sure we have a valid device_token
+    if not dfxapi.Settings.device_token:
+        print("Please register first to obtain a device_token")
+        return
+
+    # 2. Make sure a study is selected
     if not config["selected_study"]:
         print("Please select a study first using 'study select'")
         return
 
-    # 2. Check if the profile_id if selected, actually exists
+    # 3. Check if the profile_id if selected, actually exists
     if args.profile_id != "":
         try:
             async with aiohttp.ClientSession(headers=headers, raise_for_status=False) as session:
@@ -562,7 +567,7 @@ def determine_action(chunk_number, number_chunks):
 
 async def register(config, license_key):
     if dfxapi.Settings.device_token:
-        print("Already registered")
+        print("Device already registered")
         return False
 
     try:
@@ -587,7 +592,7 @@ async def register(config, license_key):
 
 async def unregister(config):
     if not dfxapi.Settings.device_token:
-        print("Not registered")
+        print("Device not registered")
         return False
 
     verified, renewed, headers, _ = await verify_renew_token(config, False)
@@ -655,6 +660,10 @@ async def logout(config):
 async def org_login(config, email, password, org_key):
     if dfxapi.Settings.user_token:
         print("Already logged in")
+        return False
+
+    if dfxapi.Settings.device_token:
+        print("Device is registered. Please unregister or use a different config file to continue.")
         return False
 
     async with aiohttp.ClientSession() as session:
