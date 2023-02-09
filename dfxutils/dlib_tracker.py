@@ -1,3 +1,17 @@
+#
+#              Copyright (c) 2016, Nuralogix Corp.
+#                      All Rights reserved
+#
+#      THIS SOFTWARE IS LICENSED BY AND IS THE CONFIDENTIAL AND
+#      PROPRIETARY PROPERTY OF NURALOGIX CORP. IT IS
+#      PROTECTED UNDER THE COPYRIGHT LAWS OF THE USA, CANADA
+#      AND OTHER FOREIGN COUNTRIES. THIS SOFTWARE OR ANY
+#      PART THEREOF, SHALL NOT, WITHOUT THE PRIOR WRITTEN CONSENT
+#      OF NURALOGIX CORP, BE USED, COPIED, DISCLOSED,
+#      DECOMPILED, DISASSEMBLED, MODIFIED OR OTHERWISE TRANSFERRED
+#      EXCEPT IN ACCORDANCE WITH THE TERMS AND CONDITIONS OF A
+#      NURALOGIX CORP SOFTWARE LICENSE AGREEMENT.
+#
 import multiprocessing as mp
 import os
 import queue
@@ -34,6 +48,10 @@ class DlibTracker():
     @staticmethod
     def __version__():
         return dlib.__version__
+
+    @property
+    def pointsPerFace(self):
+        return 65
 
     def __del__(self):
         self.stop()
@@ -82,7 +100,14 @@ class DlibTracker():
                 newy = face_points.part(j).y + y if face_points.part(j).y + y > 0 else 0
                 pointname = DlibTracker._dlib2mpeg4[j]
                 smoothedx, smoothedy = self._smoothPoints(newx, newy, pointname)
-                points[pointname] = {"x": smoothedx, "y": smoothedy, "valid": True, "estimated": True, "quality": 1.0}
+                points[pointname] = {
+                    "x": smoothedx,
+                    "y": smoothedy,
+                    "z": 0,
+                    "valid": True,
+                    "estimated": True,
+                    "quality": 1.0,
+                }
             faces[str(i)] = {
                 "id": str(i + 1),
                 "rect.x": rect.left() + x if rect.left() + x > 0 else 0,

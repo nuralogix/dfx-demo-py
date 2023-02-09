@@ -44,6 +44,14 @@ class MediaPipeTracker():
                                                                  min_tracking_confidence=min_track_conf)
         self._mediapipe_initialized = True
 
+    @staticmethod
+    def __version__():
+        return mediapipe.__version__
+
+    @property
+    def pointsPerFace(self):
+        return 130
+
     def _trackFacesThreaded(self):
         maxFaces, refine_landmarks, min_det_conf, min_track_conf = self._init_params
         self._initializeMediaPipe(maxFaces, refine_landmarks, min_det_conf, min_track_conf)
@@ -123,7 +131,7 @@ class MediaPipeTracker():
                     "13.8": self._pipe2mpeg4(image.shape, face.landmark, 215, 58),
                     "13.6": self._pipe2mpeg4(image.shape, face.landmark, 137, 93, 132),
                     "13.4": self._pipe2mpeg4(image.shape, face.landmark, 234),
-                    "13.2": self._pipe2mpeg4(image.shape, face.landmark, 168, 127),
+                    "13.2": self._pipe2mpeg4(image.shape, face.landmark, 162, 127),
 
                     # Eyebrow
                     "4.6": self._pipe2mpeg4(image.shape, face.landmark, 70),

@@ -1,5 +1,5 @@
 #
-#              Copyright (c) 2016-2021, Nuralogix Corp.
+#              Copyright (c) 2016, Nuralogix Corp.
 #                      All Rights reserved
 #
 #      THIS SOFTWARE IS LICENSED BY AND IS THE CONFIDENTIAL AND
@@ -72,8 +72,12 @@ class VisageTracker():
     def pointsPerFace(self):
         if "8.3" in self.__version__():
             return 191
-        elif "8.6" in self.__version__() or "8.7" in self.__version__():
+        elif "8.6" in self.__version__():
             return 188
+        elif "8.7" in self.__version__():
+            return 205
+        elif "8.8" in self.__version__():
+            return 205
         else:
             return 191
 
