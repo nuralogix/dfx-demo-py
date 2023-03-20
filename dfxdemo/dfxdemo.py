@@ -371,8 +371,7 @@ async def main(args):
         _, response = await dfxapi.Measurements.create(session,
                                                        config["selected_study"],
                                                        user_profile_id=args.profile_id,
-                                                       partner_id=args.partner_id,
-                                                       streaming=args.stream)
+                                                       partner_id=args.partner_id)
         app.measurement_id = response["ID"]
         print(f"Created measurement {app.measurement_id}")
 
@@ -1023,7 +1022,6 @@ def cmdline():
                                  "--demographics",
                                  help="Path to JSON file containing user demographics",
                                  default=None)
-        make_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
         make_parser.add_argument("--debug_study_cfg_file",
                                  help="Study config file to use instead of data from API (debugging)",
                                  type=str,
@@ -1066,7 +1064,6 @@ def cmdline():
                                    "--demographics",
                                    help="Path to JSON file containing user demographics",
                                    default=None)
-        camera_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
         camera_parser.add_argument("--debug_study_cfg_file",
                                    help="Study config file to use instead of data from API (debugging)",
                                    type=str,
@@ -1097,7 +1094,6 @@ def cmdline():
     mk_ch_parser.add_argument("-cd", "--chunk_duration_s", help="Chunk duration (seconds)", type=float, default=5.0)
     mk_ch_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
     mk_ch_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
-    mk_ch_parser.add_argument("--stream", help="Make a streaming measurement", action="store_true", default=False)
     args = parser.parse_args()
 
     # https://github.com/aio-libs/aiohttp/issues/4324
