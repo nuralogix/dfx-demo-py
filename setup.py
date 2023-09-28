@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='dfxdemo',
-    version='0.20.1',
+    version='0.20.2',
     packages=find_packages(),
     install_requires=[
         'dfx-apiv2-client>=0.13,<0.14',
@@ -11,7 +11,7 @@ setup(
     ],
     extras_require={
         "dlib": ["dlib>=19,!=19.22,!=19.22.1"],
-        "mediapipe": ["mediapipe>=0.9,<0.10"],
+        "mediapipe": ["mediapipe>=0.9,<0.11"],
         "visage": ["libvisage"],
     },
     setup_requires=['cmake', 'wheel'],
