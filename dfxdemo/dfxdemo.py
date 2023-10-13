@@ -320,7 +320,7 @@ async def main(args):
             if (smoking := app.demographics.get("smoking")) is not None:
                 collector.setFaceAttribute("1", dfxsdk.FaceAttribute.SMOKER, smoking)
                 print(f"       SMOKER: {smoking}")
-            if (diabetes_text := app.demographics.get("diabetes")) is not None:
+            if (diabetes_text := app.demographics.get("diabetes")) in ["0", "type1", "type2"]:
                 diabetes = dfxsdk.FaceValue.DIABETES_NONE
                 if diabetes_text == "type1":
                     diabetes = dfxsdk.FaceValue.DIABETES_TYPE1
