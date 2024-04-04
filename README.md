@@ -51,7 +51,7 @@ python -m pip install --upgrade pip setuptools wheel
 ```
 
 Download the
-[Python wheel for the DeepAffex™ Extraction Library](https://deepaffex.ai/developers-sdk)
+[Python wheel for the DeepAffex™ Extraction Library](https://deepaffex.ai/downloads)
 for your platform to the `wheels/` folder.
 
 Install `dfxdemo` in editable mode (and automatically install other
@@ -240,9 +240,9 @@ into the 'res' folder.
 ## Additional resources
 
 * [Developers Guide](http://docs.deepaffex.ai/guide/index.html)
-* [DeepAffex™ Extraction Library](https://deepaffex.ai/developers-sdk)
+* [DeepAffex™ Extraction Library](https://deepaffex.ai/downloads)
   * [C++ Docs](http://docs.deepaffex.ai/c/index.html)
   * [Python Docs](http://docs.deepaffex.ai/python/index.html) **TODO**
   * [.NET Docs](http://docs.deepaffex.ai/dotnet/index.html)
-* [Cloud API](https://deepaffex.ai/developers-api)
+* [Cloud API](https://deepaffex.ai/api)
   * [Apiary](https://dfxapiversion10.docs.apiary.io/)
