@@ -220,6 +220,7 @@ async def main(args):
     if args.subcommand == "make" or args.subcommand == "make_camera":
         # ..using a video or camera
         app.is_camera = args.subcommand == "make_camera"
+        app.is_infrared = not app.is_camera and args.infrared
         headless = cv2.version.headless or "headless" in args and args.headless
         image_src_name = f"Camera {args.camera}" if app.is_camera else os.path.basename(args.video_path)
         try:
@@ -792,6 +793,9 @@ async def retrieve_sdk_config(headers, config, config_file, sdk_id):
 
 
 async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer, app):
+    # Set channel order based on infrared
+    channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR if not app.is_infrared else dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED888
+
     # Read frames from the image source, track faces and extract using collector
     while True:
         # Grab a frame
@@ -817,8 +821,7 @@ async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer,
         tracked_faces = tracker.trackFaces(image, frame_number, frame_timestamp_ns / 1000000.0)
 
         # Create a DFX VideoFrame, then a DFX Frame from the DFX VideoFrame and add DFX faces to it
-        dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_timestamp_ns,
-                                            dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR)
+        dfx_video_frame = dfxsdk.VideoFrame(image, frame_number, frame_timestamp_ns, channelOrder)
         dfx_frame = collector.createFrame(dfx_video_frame)
         if len(tracked_faces) > 0:
             tracked_face = next(iter(tracked_faces.values()))  # We only care about the first face in this demo
@@ -1046,6 +1049,10 @@ def cmdline():
         make_parser.add_argument("--use-video-timestamps",
                                  help="Use timestamps embedded in video instead of calculating from frame numbers "
                                  "(doesn't work on all videos)",
+                                 action="store_true",
+                                 default=False)
+        make_parser.add_argument("--infrared",
+                                 help="Assume video is from infrared camera",
                                  action="store_true",
                                  default=False)
         if not cv2.version.headless:
