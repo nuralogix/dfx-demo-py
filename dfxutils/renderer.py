@@ -46,6 +46,9 @@ class Renderer():
         self._sent_chunk = None
         self._timestamps_ns = deque(maxlen=11)
         self._last_frame_number = None
+        if self._app.extract_only:
+            for k in _message_state:
+                _message_state[k] = _message_state[k].replace("Measurement", "Extraction").replace("measure", "extract")
 
     async def render(self):
         render_image, meta = None, None
@@ -202,7 +205,8 @@ class Renderer():
 
         # Render chunk numbers and results
         if self._sent_chunk is not None:
-            r = self._draw_text(f"Sent chunk: {self._sent_chunk + 1} of {self._app.number_chunks}", render_image,
+            msg = "Saved" if self._app.extract_only else "Sent"
+            r = self._draw_text(f"{msg} chunk: {self._sent_chunk + 1} of {self._app.number_chunks}", render_image,
                                 (c, r))
         if self._results:
             r = self._draw_text(f"Received result: {self._recv_chunk + 1} of {self._app.number_chunks}", render_image,
