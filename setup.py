@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='dfxdemo',
-    version='0.22.2',
+    version='0.23.0',
     packages=find_packages(),
     install_requires=[
         'dfx-apiv2-client>=0.14,<0.15',
@@ -18,6 +18,7 @@ setup(
     entry_points={
         'console_scripts': [
             'dfxdemo = dfxdemo.dfxdemo:cmdline',
+            "dfxextract = dfxdemo.dfxextract:cmdline"
         ],
     },
 )

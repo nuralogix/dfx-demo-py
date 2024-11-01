@@ -24,3 +24,4 @@ class AppState:
     constraints_cfg = None
     demographics = None
     is_infrared = False
+    extract_only = False
