@@ -104,7 +104,8 @@ async def main(args):
     using_user_token = bool(dfxapi.Settings.user_token)
     verified, renewed, headers, new_config = await verify_renew_token(config, using_user_token)
     if not verified:
-        save_config(new_config, args.config_file)
+        if new_config is not None:
+            save_config(new_config, args.config_file)
         if not renewed:
             return
 
@@ -622,14 +623,22 @@ async def register(config, license_key):
 
 
 async def unregister(config):
+    # Unregister is only "successful" if the call to
+    # Organizations.unregister_license is successful OR
+    # if the token has expired AND cannot be renewed.
+
     if not dfxapi.Settings.device_token:
         print("Device not registered")
         return False
 
-    verified, renewed, headers, _ = await verify_renew_token(config, False)
+    verified, renewed, headers, new_config = await verify_renew_token(config, False)
     if not (verified or renewed):
-        print("Unregister failed. Could not verify or renew token.")
-        return False
+        if new_config is None:
+            print("Unregister failed. Could not verify or renew token.")
+            return False
+        else:
+            config = new_config
+            return True
 
     async with aiohttp.ClientSession(headers=headers) as session:
         status, body = await dfxapi.Organizations.unregister_license(session)
@@ -646,7 +655,8 @@ async def unregister(config):
 
             return True
         else:
-            print(f"Unregister failed {status}: {body}")
+            print("Unregister failed")
+            print(f"{status}: {body}")
             return False
 
 
@@ -669,7 +679,8 @@ async def login(config, email, password):
             print("Login successful")
             return True
         else:
-            print(f"Login failed {status}: {body}")
+            print("Login failed")
+            print(f"{status}: {body}")
             return False
 
 
@@ -706,7 +717,8 @@ async def org_login(config, email, password, org_key):
             print("Login successful")
             return True
         else:
-            print(f"Login failed {status}: {body}")
+            print("Login failed")
+            print(f"{status}: {body}")
             return False
 
 
@@ -724,7 +736,14 @@ async def verify_renew_token(config, using_user_token):
         if status < 400:
             return True, False, headers, None
 
-        # It's not valid, so attempt to renew it...
+        # Something other than an expired token went wrong, so bail without touching saved tokens
+        if not (status == 401 and "Code" in body and body["Code"] == "TOKEN_EXPIRED"):
+            # Show error from verify_token failure
+            print(f"Your {token_type} token could not be verified.")
+            print(f"{status}: {body}")
+            return False, False, None, None
+
+        # Token has expired, attempt to renew it...
         if using_user_token:
             renew_status, renew_body = await dfxapi.Auths.renew_user_token(session)
         else:
@@ -734,11 +753,15 @@ async def verify_renew_token(config, using_user_token):
         if renew_status >= 400:
             # Show error from verify_token failure
             print(f"Your {token_type} token could not be verified.")
-            PP.print_pretty(body)
+            print(f"{status}: {body}")
 
             # Show error from renew_token failure
             print(f"Attempted {token_type} token refresh but failed, please register and/or login again!")
-            PP.print_pretty(renew_body)
+            print(f"{renew_status}: {renew_body}")
+
+            # Something other than an expired token went wrong, so bail without touching saved tokens
+            if not (renew_status == 401 and "Code" in renew_body and renew_body["Code"] == "TOKEN_EXPIRED"):
+                return False, False, None, None
 
             # Erase saved tokens
             if using_user_token:
@@ -748,6 +771,8 @@ async def verify_renew_token(config, using_user_token):
                 config["device_id"] = ""
                 config["device_token"] = ""
                 config["device_refresh_token"] = ""
+                config["user_token"] = ""  # User tokens are also invalid if device tokens are
+                config["user_refresh_token"] = ""
                 config["role_id"] = ""
                 config["user_id"] = ""
 
@@ -769,7 +794,7 @@ async def verify_renew_token(config, using_user_token):
             headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
 
         # Continue
-        print("Refreshed token. Continuing with command...")
+        print(f"Refreshed {token_type} token. Continuing with command...")
 
         return False, True, headers, config
 
