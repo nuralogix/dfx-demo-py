@@ -14,7 +14,7 @@ RUN python -m venv ${VENV}
 ENV PATH="${VENV}/bin:${PATH}"
 
 # Download DFX Extraction Library wheel
-ADD https://s3.us-east-2.amazonaws.com/nuralogix-assets/dfx-sdk/python/libdfx-4.13.4-py3-none-linux_x86_64.whl /wheel/
+ADD https://s3.us-east-2.amazonaws.com/nuralogix-assets/dfx-sdk/python/libdfx-4.14.5-py3-none-linux_x86_64.whl /wheel/
 
 # Add any local wheels
 ADD wheels/* /wheel/
