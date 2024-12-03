@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import base64
 import copy
 import json
 import math
@@ -87,9 +88,16 @@ async def main(args):
         print("Created DFX Factory:", factory.getVersion())
         sdk_id = factory.getSdkId()
 
-        # Get study config data from a file
+        # Get study config data from a .dat file or from a dfxdemo config.json file
         with open(args.study_cfg_file, 'rb') as f:
-            study_cfg_bytes = f.read()
+            file_bytes = f.read()
+            try:
+                # Try to interpret as a config.json
+                config = json.loads(file_bytes)
+                study_cfg_bytes = base64.standard_b64decode(config["study_cfg_data"])
+            except Exception:
+                # Just pass along the raw bytes
+                study_cfg_bytes = file_bytes
     except Exception as e:
         print(e)
         return
