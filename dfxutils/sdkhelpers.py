@@ -136,3 +136,51 @@ class DfxSdkHelpers:
             result["Notes"] = notes
 
         return result
+
+    @staticmethod
+    def set_user_demographics(collector, demographics):
+        if (gender := demographics.get("gender")) is not None:
+            sex_at_birth = dfxsdk.FaceValue.SEX_NOT_PROVIDED
+            if gender == "male":
+                sex_at_birth = dfxsdk.FaceValue.SEX_ASSIGNED_MALE_AT_BIRTH
+            elif gender == "female":
+                sex_at_birth = dfxsdk.FaceValue.SEX_ASSIGNED_FEMALE_AT_BIRTH
+            collector.setFaceAttribute("1", dfxsdk.FaceAttribute.SEX_ASSIGNED_AT_BIRTH, sex_at_birth)
+            print("       SEX_ASSIGNED_AT_BIRTH:", sex_at_birth)
+        if (age := demographics.get("age")) is not None:
+            success = collector.setFaceAttribute("1", dfxsdk.FaceAttribute.AGE_YEARS, age)
+            if success:
+                print(f"       AGE_YEARS: {age}")
+            else:
+                return False
+        if (height := demographics.get("height")) is not None:
+            success = collector.setFaceAttribute("1", dfxsdk.FaceAttribute.HEIGHT_CM, height)
+            if success:
+                print(f"       HEIGHT_CM: {height}")
+            else:
+                return
+        if (weight := demographics.get("weight")) is not None:
+            success = collector.setFaceAttribute("1", dfxsdk.FaceAttribute.WEIGHT_KG, weight)
+            if success:
+                print(f"       WEIGHT_KG: {weight}")
+            else:
+                return
+        if (smoking := demographics.get("smoking")) is not None:
+            collector.setFaceAttribute("1", dfxsdk.FaceAttribute.SMOKER, smoking)
+            print(f"       SMOKER: {smoking}")
+        if (diabetes_text := demographics.get("diabetes")) in ["0", "type1", "type2"]:
+            diabetes = dfxsdk.FaceValue.DIABETES_NONE
+            if diabetes_text == "type1":
+                diabetes = dfxsdk.FaceValue.DIABETES_TYPE1
+            elif diabetes_text == "type2":
+                diabetes = dfxsdk.FaceValue.DIABETES_TYPE2
+            collector.setFaceAttribute("1", dfxsdk.FaceAttribute.DIABETES, diabetes)
+            print("       DIABETES:", diabetes)
+        if (bloodpressuremedication := demographics.get("bloodpressuremedication")) is not None:
+            collector.setFaceAttribute("1", dfxsdk.FaceAttribute.BLOOD_PRESSURE_MEDICATION, bloodpressuremedication)
+            print(f"       BLOOD_PRESSURE_MEDICATION: {bloodpressuremedication}")
+        if (hypertensive := demographics.get("hypertensive")) is not None:
+            collector.setFaceAttribute("1", dfxsdk.FaceAttribute.HYPERTENSIVE, hypertensive)
+            print(f"       HYPERTENSIVE: {hypertensive}")
+
+        return True
