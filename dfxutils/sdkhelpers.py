@@ -147,27 +147,42 @@ class DfxSdkHelpers:
                 sex_at_birth = dfxsdk.FaceValue.SEX_ASSIGNED_FEMALE_AT_BIRTH
             collector.setFaceAttribute("1", dfxsdk.FaceAttribute.SEX_ASSIGNED_AT_BIRTH, sex_at_birth)
             print("       SEX_ASSIGNED_AT_BIRTH:", sex_at_birth)
-        if (age := demographics.get("age")) is not None:
+        else:
+            print("       Warn: SEX_ASSIGNED_AT_BIRTH not provided")
+
+        if isinstance(age := demographics.get("age"), (int, float)):
             success = collector.setFaceAttribute("1", dfxsdk.FaceAttribute.AGE_YEARS, age)
             if success:
                 print(f"       AGE_YEARS: {age}")
             else:
                 return False
-        if (height := demographics.get("height")) is not None:
+        else:
+            print("       Warn: AGE_YEARS not provided")
+
+        if isinstance(height := demographics.get("height"), (int, float)):
             success = collector.setFaceAttribute("1", dfxsdk.FaceAttribute.HEIGHT_CM, height)
             if success:
                 print(f"       HEIGHT_CM: {height}")
             else:
                 return
-        if (weight := demographics.get("weight")) is not None:
+        else:
+            print("       Warn: HEIGHT_CM not provided")
+
+        if isinstance(weight := demographics.get("weight"), (int, float)):
             success = collector.setFaceAttribute("1", dfxsdk.FaceAttribute.WEIGHT_KG, weight)
             if success:
                 print(f"       WEIGHT_KG: {weight}")
             else:
                 return
-        if (smoking := demographics.get("smoking")) is not None:
+        else:
+            print("       Warn: WEIGHT_KG not provided")
+
+        if (smoking := demographics.get("smoking")) in (0, 1):
             collector.setFaceAttribute("1", dfxsdk.FaceAttribute.SMOKER, smoking)
             print(f"       SMOKER: {smoking}")
+        else:
+            print("       Warn: SMOKER not provided")
+
         if (diabetes_text := demographics.get("diabetes")) in ["0", "type1", "type2"]:
             diabetes = dfxsdk.FaceValue.DIABETES_NONE
             if diabetes_text == "type1":
@@ -176,11 +191,19 @@ class DfxSdkHelpers:
                 diabetes = dfxsdk.FaceValue.DIABETES_TYPE2
             collector.setFaceAttribute("1", dfxsdk.FaceAttribute.DIABETES, diabetes)
             print("       DIABETES:", diabetes)
-        if (bloodpressuremedication := demographics.get("bloodpressuremedication")) is not None:
+        else:
+            print("       Warn: DIABETES not provided")
+
+        if (bloodpressuremedication := demographics.get("bloodpressuremedication")) in (0, 1):
             collector.setFaceAttribute("1", dfxsdk.FaceAttribute.BLOOD_PRESSURE_MEDICATION, bloodpressuremedication)
             print(f"       BLOOD_PRESSURE_MEDICATION: {bloodpressuremedication}")
-        if (hypertensive := demographics.get("hypertensive")) is not None:
+        else:
+            print("       Warn: BLOOD_PRESSURE_MEDICATION not provided")
+
+        if (hypertensive := demographics.get("hypertensive")) in (0, 1):
             collector.setFaceAttribute("1", dfxsdk.FaceAttribute.HYPERTENSIVE, hypertensive)
             print(f"       HYPERTENSIVE: {hypertensive}")
+        else:
+            print("       Warn: HYPERTENSIVE not provided")
 
         return True
