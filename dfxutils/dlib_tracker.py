@@ -58,7 +58,7 @@ class DlibTracker():
 
     def _detectFacesThreaded(self):
         while True:
-            image = self._work_queue.get()
+            image, frameNumber, timeStamp_ms = self._work_queue.get()
             if image is None:
                 break
             detected_faces = self._face_detector(image, 0)
@@ -67,13 +67,12 @@ class DlibTracker():
             except queue.Full:
                 pass
 
-    def trackFaces(self, image, frameNumber, timeStamp_ms, searchRect=None, desiredAttributes=None):
-        x, y, w, h = self._sanitizeRoi(image.shape, searchRect)
-        searchImage = image[y:y + h, x:x + w]
+    def trackFaces(self, image, frameNumber, timeStamp_ms):
+        x, y, w, h = self._sanitizeRoi(image.shape, None)
 
         if self._fd_fast:
             try:
-                self._work_queue.put_nowait(np.copy(searchImage))
+                self._work_queue.put_nowait((np.copy(image), frameNumber, timeStamp_ms))
             except queue.Full:
                 pass
 
@@ -84,14 +83,14 @@ class DlibTracker():
 
             # Force face detection if the result was empty if using the "smart" strategy
             if self._fd_smart and not self._last_detected_faces:
-                self._last_detected_faces = self._face_detector(searchImage, 0)
+                self._last_detected_faces = self._face_detector(image, 0)
         else:
-            self._last_detected_faces = self._face_detector(searchImage, 0)
+            self._last_detected_faces = self._face_detector(image, 0)
 
         face_rects = self._last_detected_faces
         faces = {}
         for i, rect in enumerate(face_rects):
-            face_points = self._pose_estimator(searchImage, rect)
+            face_points = self._pose_estimator(image, rect)
             points = {}
             for j in range(face_points.num_parts):
                 # The 0 check is here is because Dlib will happily give you negative coordinates
@@ -123,7 +122,7 @@ class DlibTracker():
 
     def stop(self):
         if self._detect_proc and self._detect_proc.is_alive():
-            self._work_queue.put(None)
+            self._work_queue.put((None, None, None))
             self._detect_proc.terminate()
             self._work_queue.cancel_join_thread()
             self._results_queue.cancel_join_thread()
