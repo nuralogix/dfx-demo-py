@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name='dfxdemo',
-    version='0.23.5',
+    version='0.24.0',
     packages=find_packages(),
     install_requires=[
-        'dfx-apiv2-client>=0.14,<0.15',
+        'dfx-apiv2-client>=0.15,<0.16',
         'libdfx>=4.14',
     ],
     extras_require={
