@@ -25,3 +25,4 @@ class AppState:
     demographics = None
     is_infrared = False
     extract_only = False
+    virtual = None
