@@ -117,7 +117,7 @@ class MediaPipeTracker():
                     # Outline
                     "13.1": self._pipe2mpeg4(image.shape, face.landmark, 356, 368),
                     "13.3": self._pipe2mpeg4(image.shape, face.landmark, 454, 447),
-                    "13.5": self._pipe2mpeg4(image.shape, face.landmark, 366, 352),
+                    "13.5": self._pipe2mpeg4(image.shape, face.landmark, 366, 323, 361),
                     "13.7": self._pipe2mpeg4(image.shape, face.landmark, 435, 288),
                     "13.9": self._pipe2mpeg4(image.shape, face.landmark, 397, 367),
                     "13.11": self._pipe2mpeg4(image.shape, face.landmark, 394, 365),
