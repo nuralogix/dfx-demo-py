@@ -222,7 +222,7 @@ async def main(args):
         # ..using a video or camera
         app.is_camera = args.subcommand == "make_camera"
         app.is_infrared = args.infrared
-        app.virtual = args.virtual
+        app.virtual = args.virtual if app.is_camera else None
         headless = cv2.version.headless or "headless" in args and args.headless
         image_src_name = f"Camera {args.camera}" if app.is_camera else os.path.basename(args.video_path)
         try:
