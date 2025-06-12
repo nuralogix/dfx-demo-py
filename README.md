@@ -213,9 +213,10 @@ You can use [Dlib](http://dlib.net/) instead of
 distribute as pre-compiled Python wheels, you will need to install a C++
 compiler and toolchain, capable of compiling Python extensions. Depending upon
 your platform, please install:
-  * Windows: [Visual Studio 2019 or newer](https://visualstudio.microsoft.com/)
-  * macOS (untested): [Xcode](https://developer.apple.com/xcode/)
-  * Linux: gcc and Python development libraries
+
+* Windows: [Visual Studio 2022 or newer](https://visualstudio.microsoft.com/)
+* macOS (untested): [Xcode](https://developer.apple.com/xcode/)
+* Linux: gcc and Python development libraries
 
   Note: On Ubuntu 22.04, the following commands should work
 

@@ -25,10 +25,12 @@ def _mirror_and_rotate(frame, mirror, rotation):
 
 
 class CameraReader:
-    def __init__(self, camera_id, mirror=True, fps=None) -> None:
+    def __init__(self, camera_id, mirror=True, fps=None, width=None, height=None) -> None:
         self._videocap = cv2.VideoCapture(int(camera_id))
         if not self._videocap.isOpened():
             raise RuntimeError(f"Could not open {int(camera_id)}")
+
+        # Set the fps, width and height if passed (usually for virtual cameras)
 
         if fps is not None:
             self._videocap.set(cv2.CAP_PROP_FPS, fps)
@@ -41,7 +43,13 @@ class CameraReader:
 
         self.mirror = mirror
         self.rotation = 0
+
+        if width is not None:
+            self._videocap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.width = int(self._videocap.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+        if height is not None:
+            self._videocap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.height = int(self._videocap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self._stop = False
 

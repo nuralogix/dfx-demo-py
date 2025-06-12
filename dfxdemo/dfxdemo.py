@@ -221,18 +221,23 @@ async def main(args):
     if args.subcommand == "make" or args.subcommand == "make_camera":
         # ..using a video or camera
         app.is_camera = args.subcommand == "make_camera"
-        app.is_infrared = not app.is_camera and args.infrared
+        app.is_infrared = args.infrared
+        app.virtual = args.virtual if app.is_camera else None
         headless = cv2.version.headless or "headless" in args and args.headless
         image_src_name = f"Camera {args.camera}" if app.is_camera else os.path.basename(args.video_path)
         try:
             # Open the camera or video
-            imreader = CameraReader(args.camera, mirror=True) if app.is_camera else VideoReader(
-                args.video_path,
-                args.start_time,
-                args.end_time,
-                rotation=args.rotation,
-                fps=args.fps,
-                use_video_timestamps=args.use_video_timestamps)
+            width, height, fps = None, None, None
+            if app.virtual is not None:
+                width, height, fps = map(int, app.virtual.replace('@', 'x').split('x'))
+            imreader = CameraReader(args.camera, mirror=True, fps=fps, width=width,
+                                    height=height) if app.is_camera else VideoReader(
+                                        args.video_path,
+                                        args.start_time,
+                                        args.end_time,
+                                        rotation=args.rotation,
+                                        fps=args.fps,
+                                        use_video_timestamps=args.use_video_timestamps)
 
             # Open the demographics file if provided
             if args.demographics is not None:
@@ -787,8 +792,16 @@ async def retrieve_sdk_config(headers, config, config_file, sdk_id):
 
 
 async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer, app):
-    # Set channel order based on infrared
-    channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR if not app.is_infrared else dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED888
+    # Set channel order based on is_infrared, is_camera and virtual
+    channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR
+    if app.is_infrared:
+        if app.is_camera:
+            if app.virtual is not None:
+                channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED888
+            else:
+                channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED
+        else:
+            channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED888
 
     # Read frames from the image source, track faces and extract using collector
     while True:
@@ -1095,6 +1108,11 @@ def cmdline():
                                    default=30)
         camera_parser.add_argument("--profile_id", help="Set the Profile ID (Participant ID)", type=str, default="")
         camera_parser.add_argument("--partner_id", help="Set the PartnerID", type=str, default="")
+        camera_parser.add_argument("--infrared", help="Assume infrared camera", action="store_true", default=False)
+        camera_parser.add_argument("--virtual",
+                                   help="Assume virtual camera if set to WxH@fps e.g. 564x682@30",
+                                   type=str,
+                                   default=None)
         camera_parser.add_argument("-dg",
                                    "--demographics",
                                    help="Path to JSON file containing user demographics",
