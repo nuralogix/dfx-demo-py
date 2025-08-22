@@ -91,7 +91,8 @@ class VideoReader:
                  stop_time=None,
                  rotation=None,
                  fps=None,
-                 use_video_timestamps=False) -> None:
+                 use_video_timestamps=False,
+                 max_seconds_to_process=120) -> None:
         self._videocap = cv2.VideoCapture(video_path)
         if not self._videocap.isOpened():
             raise RuntimeError(f"Could not open {video_path}")
@@ -117,11 +118,13 @@ class VideoReader:
             self.stop_frame = min(self.stop_frame, int(stop_time * self.fps))
 
         self.frames_to_process = self.stop_frame - self.start_frame
-        if self.frames_to_process / self.fps > 120:
+        extraction_duration = self.frames_to_process / self.fps
+        if extraction_duration > max_seconds_to_process:
             print(
-                f"Extraction duration {self.frames_to_process / self.fps:.1f}s is longer than 2 minutes; processing first 2 minutes only."
+                f"Extraction duration of {extraction_duration:.1f} seconds is longer than {max_seconds_to_process}"
+                f" seconds; processing first {max_seconds_to_process} seconds only."
             )
-            self.stop_frame = int(self.fps * 120)
+            self.stop_frame = int(self.fps * max_seconds_to_process)
             self.frames_to_process = self.stop_frame - self.start_frame
         if self.start_frame > 0:
             self._videocap.set(cv2.CAP_PROP_POS_FRAMES, self.start_frame)
