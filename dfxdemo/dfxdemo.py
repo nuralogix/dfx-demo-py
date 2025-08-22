@@ -237,7 +237,8 @@ async def main(args):
                                         args.end_time,
                                         rotation=args.rotation,
                                         fps=args.fps,
-                                        use_video_timestamps=args.use_video_timestamps)
+                                        use_video_timestamps=args.use_video_timestamps,
+                                        max_seconds_to_process=120)
 
             # Open the demographics file if provided
             if args.demographics is not None:
