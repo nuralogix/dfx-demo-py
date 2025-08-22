@@ -26,7 +26,7 @@ license and copy and save it locally. (You will need it for registering later.)
 
 Please ensure you have the following software installed:
 
-* [Python 3.8 or newer (64-bit)](https://www.python.org/)
+* [Python 3.10 or newer (64-bit)](https://www.python.org/)
 * [Git](https://git-scm.com/)
 
 Note: Please see the section [Using Docker](#using-docker) for an alternative.
