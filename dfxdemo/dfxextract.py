@@ -9,7 +9,6 @@ import platform
 
 import cv2
 import libdfx as dfxsdk
-import pkg_resources
 
 from dfxutils.app import AppState, MeasurementStep
 from dfxutils.opencvhelpers import CameraReader, VideoReader
@@ -39,7 +38,8 @@ if not FT_CHOICES:
     raise ImportError("Could not import any face tracker")
 
 try:
-    _version = f"v{pkg_resources.require('dfxdemo')[0].version}"
+    import importlib.metadata
+    _version = f"v{importlib.metadata.version('dfxdemo')}"
 except Exception:
     _version = ""
 

@@ -14,7 +14,6 @@ import aiohttp
 import cv2
 import dfx_apiv2_client as dfxapi
 import libdfx as dfxsdk
-import pkg_resources
 import yarl
 
 from dfxutils.app import AppState, MeasurementStep
@@ -43,7 +42,8 @@ except ImportError:
     pass
 
 try:
-    _version = f"v{pkg_resources.require('dfxdemo')[0].version}"
+    import importlib.metadata
+    _version = f"v{importlib.metadata.version('dfxdemo')}"
 except Exception:
     _version = ""
 

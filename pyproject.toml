@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "cmake"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dfxdemo"
+version = "0.26.0"
+description = "dfxdemo is a commandline demo for NuraLogix DeepAffex™ technologies."
+requires-python = ">=3.9"
+dependencies = [
+    "dfx-apiv2-client>=0.15,<0.16",
+    "libdfx>=4.14"
+]
+
+[project.optional-dependencies]
+dlib = [
+    "dlib>=19,!=19.22,!=19.22.1",
+    "opencv-python>=4.6,<5"
+]
+mediapipe = [
+    "mediapipe>=0.9,<0.11"
+]
+visage = [
+    "libvisage",
+    "opencv-python>=4.6,<5"
+]
+
+[project.scripts]
+dfxdemo = "dfxdemo.dfxdemo:cmdline"
+dfxextract = "dfxdemo.dfxextract:cmdline"
+
+[tool.setuptools]
+packages = ["dfxdemo", "dfxutils"]
