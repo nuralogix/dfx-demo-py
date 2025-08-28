@@ -30,14 +30,14 @@ except ImportError:
     pass
 
 try:
-    from dfxutils.mediapipe_tracker import MediaPipeTracker
-    FT_CHOICES.append("mediapipe")
+    from dfxutils.mp_tasksvision_tracker import MediaPipeTasksVisionTracker
+    FT_CHOICES.append("taskvision")
 except ImportError:
     pass
 
 try:
-    from dfxutils.mp_tasksvision_tracker import TaskvisionTracker
-    FT_CHOICES.append("mptasksvision")
+    from dfxutils.mediapipe_tracker import MediaPipeTracker
+    FT_CHOICES.append("mediapipe")
 except ImportError:
     pass
 
@@ -264,7 +264,7 @@ async def main(args):
             elif args.face_tracker == "mediapipe":
                 tracker = MediaPipeTracker(1, track_in_background=app.is_camera)
             else:
-                tracker = TaskvisionTracker(1, track_in_background=app.is_camera)
+                tracker = MediaPipeTasksVisionTracker(1, track_in_background=app.is_camera)
 
             # Create DFX SDK factory
             factory = dfxsdk.Factory()

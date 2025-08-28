@@ -20,7 +20,7 @@ from mediapipe.tasks import python as mppython
 import os
 
 
-class TaskvisionTracker():
+class MediaPipeTasksVisionTracker():
 
     def __init__(self, max_faces, track_in_background=False) -> None:
         self._mediapipe_initialized = False
