@@ -261,8 +261,10 @@ async def main(args):
                                         track_in_background=app.is_camera)
             elif args.face_tracker == "dlib":
                 tracker = DlibTracker()
-            else:
+            elif args.face_tracker == "mediapipe":
                 tracker = MediaPipeTracker(1, track_in_background=app.is_camera)
+            else:
+                tracker = TaskvisionTracker(1, track_in_background=app.is_camera)
 
             # Create DFX SDK factory
             factory = dfxsdk.Factory()
