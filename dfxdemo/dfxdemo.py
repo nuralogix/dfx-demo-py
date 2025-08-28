@@ -36,6 +36,12 @@ except ImportError:
     pass
 
 try:
+    from dfxutils.mp_tasksvision_tracker import TaskvisionTracker
+    FT_CHOICES.append("mptasksvision")
+except ImportError:
+    pass
+
+try:
     from dfxutils.dlib_tracker import DlibTracker
     FT_CHOICES.append("dlib")
 except ImportError:
