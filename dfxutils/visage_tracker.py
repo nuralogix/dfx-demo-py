@@ -18,7 +18,7 @@ import os
 import queue
 import pathlib
 
-import libvisage as visage
+import libvisage as visage 
 import numpy as np
 
 

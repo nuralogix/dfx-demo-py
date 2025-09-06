@@ -22,18 +22,27 @@ from dfxutils.prettyprint import PrettyPrinter as PP
 from dfxutils.renderer import NullRenderer, Renderer
 from dfxutils.sdkhelpers import DfxSdkHelpers
 
-FT_CHOICES = []
-try:
-    from dfxutils.visage_tracker import VisageTracker
-    FT_CHOICES.append("visage")
-except ImportError:
-    pass
+from pygamerenderer import PygameRenderer
 
-try:
-    from dfxutils.mp_tasksvision_tracker import MediaPipeTasksVisionTracker
-    FT_CHOICES.append("taskvision")
-except ImportError:
-    pass
+FT_CHOICES = []
+if False:
+    try:
+        from dfxutils.visage_tracker import VisageTracker
+        FT_CHOICES.append("visage")
+    except ImportError:
+        pass
+
+    try:
+        from dfxutils.mp_tasksvision_tracker import MediaPipeTasksVisionTracker
+        FT_CHOICES.append("taskvision")
+    except ImportError:
+        pass
+
+    try:
+        from dfxutils.dlib_tracker import DlibTracker
+        FT_CHOICES.append("dlib")
+    except ImportError:
+        pass
 
 try:
     from dfxutils.mediapipe_tracker import MediaPipeTracker
@@ -41,11 +50,7 @@ try:
 except ImportError:
     pass
 
-try:
-    from dfxutils.dlib_tracker import DlibTracker
-    FT_CHOICES.append("dlib")
-except ImportError:
-    pass
+
 
 try:
     import importlib.metadata
@@ -54,7 +59,7 @@ except Exception:
     _version = ""
 
 
-async def main(args):
+async def main(args,screen = None):
     # Load config
     config = load_config(args.config_file)
 
@@ -411,13 +416,26 @@ async def main(args):
 
             # Coroutine to produce chunks and put then in chunk_queue
             if args.subcommand == "make" or args.subcommand == "make_camera":
-                renderer = Renderer(
-                    _version,
-                    image_src_name,
-                    imreader.fps,
-                    app,
-                    0.5 if imreader.height >= 720 else 1.0,
-                ) if app.is_camera or not headless else NullRenderer()
+                if (screen is not None):
+                    renderer = PygameRenderer(
+                        _version,
+                        image_src_name,
+                        imreader.fps,
+                        app,
+                        screen,
+                        False,
+                        0.5 if imreader.height >= 720 else 1.0,
+                    )
+                elif app.is_camera or not headless:
+                    renderer = Renderer(
+                        _version,
+                        image_src_name,
+                        imreader.fps,
+                        app,
+                        0.5 if imreader.height >= 720 else 1.0,
+                    ) 
+                else:
+                    renderer = NullRenderer()
                 if not app.is_camera:
                     print("Extraction started")
                 else:
@@ -481,9 +499,14 @@ async def main(args):
                     if request_id == results_request_id:
                         json_result = json.loads(payload)
                         result = DfxSdkHelpers.json_result_to_dict(json_result)
+                        
+                        
                         renderer.set_results(result.copy())
                         print(payload) if args.json else PP.print_sdk_result(result)
+                        
                         num_results_received += 1
+                        if (renderer is PygameRenderer):
+                            renderer.setResultsCount(num_results_received)
                     # We are done if the last chunk is sent and number of results received equals number of chunks sent
                     if app.last_chunk_sent and num_results_received == app.number_chunks_sent:
                         await ws.close()
