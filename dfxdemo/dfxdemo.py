@@ -264,7 +264,7 @@ async def main(args):
             elif args.face_tracker == "mediapipe":
                 tracker = MediaPipeTracker(1, track_in_background=app.is_camera)
             else:
-                tracker = MediaPipeTasksVisionTracker(1, track_in_background=app.is_camera)
+                tracker = MediaPipeTasksVisionTracker(1, track_in_background=app.is_camera, gpu=args.taskvision_gpu)
 
             # Create DFX SDK factory
             factory = dfxsdk.Factory()
@@ -1139,6 +1139,11 @@ def cmdline():
                                    help=f"Face tracker to use (default: {FT_CHOICES[0]})",
                                    default=FT_CHOICES[0],
                                    choices=FT_CHOICES)
+        if "taskvision" in FT_CHOICES:
+            camera_parser.add_argument("--taskvision_gpu",
+                                     help="Use GPU with Mediapipe Tasks Vision tracker",
+                                     action="store_true",
+                                     default=False)
         if "visage" in FT_CHOICES:
             camera_parser.add_argument("-vl",
                                        "--visage_license",
