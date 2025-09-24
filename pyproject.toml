@@ -4,8 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dfxdemo"
-version = "0.27.0"
+version = "0.28.0"
 description = "dfxdemo is a commandline demo for NuraLogix DeepAffex™ technologies."
+readme = "README.md"
+authors = [
+    { name = "NuraLogix Corporation" }
+]
+license = { file = "LICENSE.txt" }
 requires-python = ">=3.9"
 dependencies = [
     "dfx-apiv2-client>=0.15,<0.16",
@@ -28,6 +33,9 @@ visage = [
 [project.scripts]
 dfxdemo = "dfxdemo.dfxdemo:cmdline"
 dfxextract = "dfxdemo.dfxextract:cmdline"
+
+[project.urls]
+Homepage = "https://github.com/nuralogix/dfx-demo-py"
 
 [tool.setuptools]
 packages = ["dfxdemo", "dfxutils"]
