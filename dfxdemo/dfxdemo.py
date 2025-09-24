@@ -658,10 +658,13 @@ async def login(config, email, password):
         print("Please register first to obtain a device_token")
         return False
 
+    pass_in_env = False
     if password is None:
         password = os.getenv("DFXDEMO_PASSWORD")
         if password is None:
             password = getpass.getpass()
+        else:
+            pass_in_env = True
 
     headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
     async with aiohttp.ClientSession(headers=headers) as session:
@@ -674,6 +677,8 @@ async def login(config, email, password):
             return True
         else:
             print("Login failed")
+            if pass_in_env:
+                print(f"Ensure password in env:DFXDEMO_PASSWORD is for {email}")
             print(f"{status}: {body}")
             return False
 
@@ -702,10 +707,13 @@ async def org_login(config, email, password, org_key):
         print("Device is registered. Please unregister or use a different config file")
         return False
 
+    pass_in_env = False
     if password is None:
         password = os.getenv("DFXDEMO_ORGPASSWORD")
         if password is None:
             password = getpass.getpass()
+        else:
+            pass_in_env = True
 
     async with aiohttp.ClientSession() as session:
         status, body = await dfxapi.Organizations.login(session, email, password, org_key)
@@ -717,6 +725,8 @@ async def org_login(config, email, password, org_key):
             return True
         else:
             print("Login failed")
+            if pass_in_env:
+                print(f"Ensure password in env:DFXDEMO_ORGPASSWORD is for {email}")
             print(f"{status}: {body}")
             return False
 
