@@ -22,16 +22,16 @@ import os
 
 class MediaPipeTasksVisionTracker():
 
-    def __init__(self, max_faces, track_in_background=False) -> None:
+    def __init__(self, max_faces, track_in_background=False, gpu=False) -> None:
         self._mediapipe_initialized = False
         self._track_in_background = track_in_background
         self._init_params = max_faces, 0.5, 0.5
         self._last_tracked_faces = {}
         self._max_faces = max_faces
         max_faces, min_det_conf, min_track_conf = self._init_params
-        self._initializeMediaPipe(max_faces, min_det_conf, min_track_conf)
+        self._initializeMediaPipe(max_faces, min_det_conf, min_track_conf, gpu)
 
-    def _initializeMediaPipe(self, max_faces, min_det_conf, min_track_conf):
+    def _initializeMediaPipe(self, max_faces, min_det_conf, min_track_conf, gpu):
         model_path = os.path.join(os.getcwd(), "res", "face_landmarker.task")
         if not os.path.exists(model_path):
             print(
@@ -40,7 +40,11 @@ class MediaPipeTasksVisionTracker():
             )
             raise FileNotFoundError(f"FaceLandmarker model file not found at {model_path}.")
 
-        base_options = mppython.BaseOptions(model_asset_path=model_path)
+        if gpu:
+            delegate = mppython.BaseOptions.Delegate.GPU
+        else:
+            delegate = mppython.BaseOptions.Delegate.CPU
+        base_options = mppython.BaseOptions(model_asset_path=model_path, delegate=delegate)
         options = mppython.vision.FaceLandmarkerOptions(
             base_options=base_options,
             output_face_blendshapes=False,
