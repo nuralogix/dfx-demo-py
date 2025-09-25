@@ -78,15 +78,15 @@ class MediaPipeTasksVisionTracker():
             self._last_tracked_faces = {}
 
     def trackFaces(self, image, _frameNumber, timeStamp_ms):
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        mp_image = mediapipe.Image(image_format=mediapipe.ImageFormat.SRGB, data=image_rgb)
+        image_rgba = cv2.cvtColor(image, cv2.COLOR_BGR2RGBA)
+        mp_image = mediapipe.Image(image_format=mediapipe.ImageFormat.SRGBA, data=image_rgba)
         if self._track_in_background:
             self._face_landmarker.detect_async(mp_image, int(timeStamp_ms))
             return self._last_tracked_faces
         else:
             result = self._face_landmarker.detect_for_video(mp_image, int(timeStamp_ms))
             if result is not None and result.face_landmarks:
-                faces = self._parse_faces_from_result(result, image_rgb.shape)
+                faces = self._parse_faces_from_result(result, image_rgba.shape)
                 return faces
             else:
                 return {}
