@@ -909,7 +909,7 @@ async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer,
                     break
             elif result == dfxsdk.CollectorState.ERROR:
                 app.step = MeasurementStep.FAILED
-                reasons = "Failed because " + dfxsdk.Collector.getLastErrorMessage()
+                print(f"Measurement failed: {collector.getLastErrorMessage()}")
 
         await renderer.put_nowait((image, (dfx_frame, frame_number, frame_timestamp_ns)))
 
