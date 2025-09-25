@@ -78,6 +78,9 @@ to make a measurement.)
 dfxdemo org register <your_license_key>
 ```
 
+You can leave <your_license_key> blank to read it via the environment variable
+`DFXDEMO_LICENSE` or enter it securely in the terminal.
+
 **Note**: By default, the demo stores tokens in a file called `config.json`.
 *In a production application, you will need to manage all tokens securely.*
 
@@ -96,6 +99,9 @@ with a fixed Study ID.
 ```shell
 dfxdemo user login <email> <password>
 ```
+
+You can leave <password> blank to read it via the environment variable
+`DFXDEMO_PASSWORD` or enter it securely in the terminal.
 
 **Note**: All the commands below, use the tokens obtained above.
 

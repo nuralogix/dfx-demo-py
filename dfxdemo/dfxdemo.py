@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import base64
 import copy
+import getpass
 import glob
 import json
 import math
@@ -585,6 +586,11 @@ async def register(config, license_key):
         print("Device already registered")
         return False
 
+    if license_key is None:
+        license_key = os.getenv("DFXDEMO_LICENSE")
+        if license_key is None:
+            license_key = getpass.getpass(prompt="DeepAffex License: ")
+
     try:
         async with aiohttp.ClientSession(raise_for_status=True) as session:
             await dfxapi.Organizations.register_license(session, license_key, "LINUX", "DFX Example", "DFXCLIENT",
@@ -652,6 +658,14 @@ async def login(config, email, password):
         print("Please register first to obtain a device_token")
         return False
 
+    pass_in_env = False
+    if password is None:
+        password = os.getenv("DFXDEMO_PASSWORD")
+        if password is None:
+            password = getpass.getpass()
+        else:
+            pass_in_env = True
+
     headers = {"Authorization": f"Bearer {dfxapi.Settings.device_token}"}
     async with aiohttp.ClientSession(headers=headers) as session:
         status, body = await dfxapi.Users.login(session, email, password)
@@ -663,6 +677,8 @@ async def login(config, email, password):
             return True
         else:
             print("Login failed")
+            if pass_in_env:
+                print(f"Ensure password in env:DFXDEMO_PASSWORD is for {email}")
             print(f"{status}: {body}")
             return False
 
@@ -691,6 +707,14 @@ async def org_login(config, email, password, org_key):
         print("Device is registered. Please unregister or use a different config file")
         return False
 
+    pass_in_env = False
+    if password is None:
+        password = os.getenv("DFXDEMO_ORGPASSWORD")
+        if password is None:
+            password = getpass.getpass()
+        else:
+            pass_in_env = True
+
     async with aiohttp.ClientSession() as session:
         status, body = await dfxapi.Organizations.login(session, email, password, org_key)
         if status < 400:
@@ -701,6 +725,8 @@ async def org_login(config, email, password, org_key):
             return True
         else:
             print("Login failed")
+            if pass_in_env:
+                print(f"Ensure password in env:DFXDEMO_ORGPASSWORD is for {email}")
             print(f"{status}: {body}")
             return False
 
@@ -955,13 +981,20 @@ def cmdline():
     subparser_orgs = subparser_top.add_parser("orgs", aliases=["o", "org"],
                                               help="Organizations").add_subparsers(dest="subcommand", required=True)
     register_parser = subparser_orgs.add_parser("register", help="Register device")
-    register_parser.add_argument("license_key", help="DFX API Organization License")
+    register_parser.add_argument(
+        "license_key",
+        help="DFX License (leave blank to read from env DFXDEMO_LICENSE or interactive entry)",
+        nargs="?",
+        default=None)
     register_parser.add_argument("--rest-url", help="Connect to DFX API using this REST URL", default=None)
     unregister_parser = subparser_orgs.add_parser("unregister", help="Unregister device")
-    o_login_parser = subparser_orgs.add_parser("login", help="Adminstrative login (no measurements)")
+    o_login_parser = subparser_orgs.add_parser("login", help="Administrative login (no measurements)")
     o_login_parser.add_argument("org_key", help="Organization Key")
     o_login_parser.add_argument("email", help="Email address")
-    o_login_parser.add_argument("password", help="Password")
+    o_login_parser.add_argument("password",
+                                help="Password (leave blank to read from env DFXDEMO_ORGPASSWORD or interactive entry)",
+                                nargs="?",
+                                default=None)
     o_list_parser = subparser_orgs.add_parser("list-measurements",
                                               aliases=[
                                                   "lm",
@@ -992,7 +1025,10 @@ def cmdline():
                                                help="Users").add_subparsers(dest="subcommand", required=True)
     login_parser = subparser_users.add_parser("login", help="User login")
     login_parser.add_argument("email", help="Email address")
-    login_parser.add_argument("password", help="Password")
+    login_parser.add_argument("password",
+                              help="Password (leave blank to read from env DFXDEMO_PASSWORD or interactive entry)",
+                              nargs="?",
+                              default=None)
     logout_parser = subparser_users.add_parser("logout", help="User logout")
 
     # profiles - create, update, remove, get, list
