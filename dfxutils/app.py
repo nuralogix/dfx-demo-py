@@ -23,5 +23,6 @@ class AppState:
     end_frame = 0
     constraints_cfg = None
     demographics = None
+    is_infrared = False
     extract_only = False
-    channel_order = ""
+    virtual = None

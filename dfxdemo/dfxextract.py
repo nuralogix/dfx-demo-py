@@ -15,13 +15,6 @@ from dfxutils.opencvhelpers import CameraReader, VideoReader
 from dfxutils.renderer import NullRenderer, Renderer
 from dfxutils.sdkhelpers import DfxSdkHelpers
 
-is_rpi = False
-try:
-    from dfxutils.rpicamerahelpers import PiCameraReader
-    is_rpi = True
-except ImportError:
-    pass
-
 FT_CHOICES = []
 try:
     from dfxutils.visage_tracker import VisageTracker
@@ -59,51 +52,30 @@ except Exception:
 
 async def main(args):
     # Handle various command line subcommands
-    assert args.command in ["video", "camera", "picameras"]
-
-    # Handle "cameras" commands - "list"
-    if is_rpi and args.command in ["picameras"]:
-        if args.subcommand == "list":
-            cameras = PiCameraReader.list()
-            for camera in cameras:
-                print(f"Camera {camera['Num']}: {camera['Model']} (ID: {camera['Id']})")
-        return
+    assert args.command in ["video", "camera"]
 
     # Prepare to process a video or camera
     app = AppState()
     app.extract_only = True
     app.is_camera = args.command == "camera"
-    app.channel_order = args.channel_order
+    app.is_infrared = args.infrared
+    app.virtual = args.virtual
     headless = cv2.version.headless or "headless" in args and args.headless
     image_src_name = f"Camera {args.camera}" if app.is_camera else os.path.basename(args.video_path)
     try:
         # Open the camera or video
-        if app.is_camera:
-            width, height, fps = None, None, None
-            if args.params is not None:
-                width, height, fps = map(int, args.params.replace('@', 'x').split('x'))
-            if is_rpi and args.picamera is not None:
-                imreader = PiCameraReader(args.camera,
-                                          mirror=True,
-                                          rotation=args.rotation,
-                                          fps=fps,
-                                          width=width,
-                                          height=height)
-            else:
-                imreader = CameraReader(args.camera,
-                                        mirror=True,
-                                        rotation=args.rotation,
-                                        fps=fps,
-                                        width=width,
-                                        height=height)
-        else:
-            imreader = VideoReader(args.video_path,
-                                   args.start_time,
-                                   args.end_time,
-                                   rotation=args.rotation,
-                                   fps=args.fps,
-                                   use_video_timestamps=args.use_video_timestamps,
-                                   max_seconds_to_process=120)
+        width, height, fps = None, None, None
+        if app.virtual is not None:
+            width, height, fps = map(int, app.virtual.replace('@', 'x').split('x'))
+        imreader = CameraReader(args.camera, mirror=True, fps=fps, width=width,
+                                height=height) if app.is_camera else VideoReader(
+                                    args.video_path,
+                                    args.start_time,
+                                    args.end_time,
+                                    rotation=args.rotation,
+                                    fps=args.fps,
+                                    use_video_timestamps=args.use_video_timestamps,
+                                    max_seconds_to_process=120)
 
         # Open the demographics file if provided
         if args.demographics is not None:
@@ -275,12 +247,16 @@ async def main(args):
 
 
 async def extract_from_imgs(chunk_queue, imreader, tracker, collector, renderer, app):
-    # Set channel order
+    # Set channel order based on is_infrared, is_camera and is_virtual
     channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_BGR
-    if app.channel_order == "infrared":
-        channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED
-    elif app.channel_order == "infrared888":
-        channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED888
+    if app.is_infrared:
+        if app.is_camera:
+            if app.virtual is not None:
+                channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED888
+            else:
+                channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED
+        else:
+            channelOrder = dfxsdk.ChannelOrder.CHANNEL_ORDER_INFRARED888
 
     # Read frames from the image source, track faces and extract using collector
     while True:
@@ -402,11 +378,10 @@ def cmdline():
                               "(doesn't work on all videos)",
                               action="store_true",
                               default=False)
-    video_parser.add_argument("-co",
-                              "--channel_order",
-                              help=f"Image channel order (default: bgr)",
-                              default="bgr",
-                              choices=["bgr", "infrared", "infrared888"])
+    video_parser.add_argument("--infrared",
+                              help="Assume video is from infrared camera",
+                              action="store_true",
+                              default=False)
     if not cv2.version.headless:
         video_parser.add_argument("--headless", help="Disable video rendering", action="store_true", default=False)
     video_parser.add_argument("-dg",
@@ -443,25 +418,11 @@ def cmdline():
                                    help="Measurement duration (seconds)",
                                    type=float,
                                    default=30)
-        camera_parser.add_argument(
-            "--params",
-            help="Set camera parameters width (W), height (H) and framerate (fps) as WxH@fps e.g. 640x480@30",
-            type=str,
-            default=None)
-        camera_parser.add_argument("--rotation",
-                                   help="Assume camera is mounted with this rotation (Must be 0, 90, 180 or 270)",
-                                   type=int,
+        camera_parser.add_argument("--infrared", help="Assume infrared camera", action="store_true", default=False)
+        camera_parser.add_argument("--virtual",
+                                   help="Assume virtual camera if set to WxH@fps e.g. 564x682@30",
+                                   type=str,
                                    default=None)
-        camera_parser.add_argument("-co",
-                                   "--channel_order",
-                                   help=f"Image channel order (default: bgr)",
-                                   default="bgr",
-                                   choices=["bgr", "infrared", "infrared888"])
-        if is_rpi:
-            camera_parser.add_argument("--picamera",
-                                       help="Assume Raspberry Pi camera",
-                                       action="store_true",
-                                       default=False)
         camera_parser.add_argument("-dg",
                                    "--demographics",
                                    help="Path to JSON file containing user demographics",
@@ -473,9 +434,9 @@ def cmdline():
                                    choices=FT_CHOICES)
         if "taskvision" in FT_CHOICES:
             camera_parser.add_argument("--taskvision_gpu",
-                                       help="Use GPU with Mediapipe Tasks Vision tracker",
-                                       action="store_true",
-                                       default=False)
+                                     help="Use GPU with Mediapipe Tasks Vision tracker",
+                                     action="store_true",
+                                     default=False)
         if "visage" in FT_CHOICES:
             camera_parser.add_argument("-vl",
                                        "--visage_license",
@@ -486,12 +447,6 @@ def cmdline():
                                        help="Use Visage Analysis module",
                                        action="store_true",
                                        default=False)
-    # picameras - list
-    if is_rpi:
-        cam_list_parser = subparser_top.add_parser("picameras",
-                                                   help="Raspberry Pi Cameras").add_subparsers(dest="subcommand",
-                                                                                               required=True)
-        cam_list_parser.add_parser("list", help="List the cameras detected")
 
     args = parser.parse_args()
 
