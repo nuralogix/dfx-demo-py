@@ -158,7 +158,9 @@ async def main(args):
     # Set the collector constraints config
     if app.is_camera:
         app.constraints_cfg = DfxSdkHelpers.ConstraintsConfig(collector.getConstraintsConfig("json"))
-        app.constraints_cfg.minimumFps = 10
+        app.constraints_cfg.minimumFps = 20
+        app.constraints_cfg.boxWidth_pct = 100
+        app.constraints_cfg.boxHeight_pct = 100
         collector.setConstraintsConfig("json", str(app.constraints_cfg))
 
     # Print the enabled constraints
