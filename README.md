@@ -30,6 +30,8 @@ Please ensure you have the following software installed:
 * [Git](https://git-scm.com/)
 
 Note: Please see the section [Using Docker](#using-docker) for an alternative.
+Note: Please see the section [Raspberry Pi](#raspberry-pi) if installing on a
+Raspberry Pi.
 
 ## Install `dfxdemo`
 
@@ -243,6 +245,65 @@ pip install -e ".[dlib]"
 Please download and unzip the
 [Dlib face landmarks dat file](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2)
 into the 'res' folder.
+
+## Raspberry Pi
+
+`dfxdemo` has basic support for Raspberry Pi. It has been verified to work on a
+Raspberry Pi 5 Model B Rev 1.1 16GB RAM running Raspberry Pi OS 64-bit
+(bullseye) with a Raspberry Pi Camera Module 3, Raspberry Pi Camera Module 3
+NoIR and Raspberry Pi Camera Module 2.
+
+### Installing
+
+Update your Raspberry Pi and install Picamera2 using `apt`.
+
+```shell
+sudo apt update
+sudo apt full-upgrade
+sudo apt install python3-picamera2
+```
+
+After cloning the repo, download the
+[Linux ARM64 Python wheel for libdfx](https://deepaffex.ai/downloads) to the
+`wheels/` folder.
+
+When creating the virtual environment, pass the `--system-site-packages` flag so
+that the Picamera2 Python package is picked up.
+
+```shell
+python -m venv venv --system-site-packages
+```
+
+In the activated venv, install `dfxdemo` in editable mode (and automatically
+install other dependencies.)
+
+```shell
+pip install -e ".[mediapipe]" -f wheels/
+```
+
+### Making a measurement
+
+After you have [registered your license](#register-your-license) and
+[logged in](#login), you can list the cameras attached to your Pi and their
+ids.
+
+```shell
+dfxdemo camera list
+```
+
+You can then choose and configure one of the listed cameras to make a
+measurement.
+
+```shell
+dfxdemo measure make_camera --picamera --params 640x480@30 --camera <id>
+```
+
+For better face tracker performance, you can install an older version of
+Mediapipe and select that as facetracker using `-ft mediapipe`.
+
+```shell
+pip install mediapipe==0.10.9
+```
 
 ## Additional resources
 
