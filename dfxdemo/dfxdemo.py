@@ -252,7 +252,7 @@ async def main(args):
                 width, height, fps = None, None, None
                 if args.params is not None:
                     width, height, fps = map(int, args.params.replace('@', 'x').split('x'))
-                if is_rpi and args.picamera is not None:
+                if is_rpi and args.picamera:
                     imreader = PiCameraReader(args.camera,
                                               mirror=True,
                                               rotation=args.rotation,
