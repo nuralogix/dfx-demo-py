@@ -246,12 +246,20 @@ Please download and unzip the
 [Dlib face landmarks dat file](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2)
 into the 'res' folder.
 
-## Raspberry Pi
+## Using a Raspberry Pi
 
-`dfxdemo` has basic support for Raspberry Pi. It has been verified to work on a
-Raspberry Pi 5 Model B Rev 1.1 16GB RAM running Raspberry Pi OS 64-bit
-(bullseye) with a Raspberry Pi Camera Module 3, Raspberry Pi Camera Module 3
-NoIR and Raspberry Pi Camera Module 2.
+`dfxdemo` has basic support for Raspberry Pi. We have verified that it works on
+these Raspberry Pi models:
+
+* Raspberry Pi 5 Model B Rev 1.1 (16GB RAM) on Raspberry Pi OS 64-bit (bookworm)
+* Raspberry Pi Compute Module 5 Rev 1.0 (8GB RAM) on Raspberry Pi OS 64-bit
+  (bookworm)
+
+with these camera modules:
+
+* Raspberry Pi Camera Module 3
+* Raspberry Pi Camera Module 3 NoIR and
+* Raspberry Pi Camera Module 2.
 
 ### Installing
 
@@ -288,7 +296,7 @@ After you have [registered your license](#register-your-license) and
 ids.
 
 ```shell
-dfxdemo camera list
+dfxdemo picameras list
 ```
 
 You can then choose and configure one of the listed cameras to make a
