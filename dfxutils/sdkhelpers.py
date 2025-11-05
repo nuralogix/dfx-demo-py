@@ -44,6 +44,11 @@ class DfxSdkHelpers:
                               valid=point['valid'],
                               estimated=point['estimated'],
                               quality=point['quality'])
+        # Add attributes
+        for attr, attr_val in json_face.items():
+            if attr not in ["id", "rect.x", "rect.y", "rect.w", "rect.h", "poseValid", "detected", "points"]:
+                face.addAttribute(attr, float(attr_val))
+
         return face
 
     @staticmethod
