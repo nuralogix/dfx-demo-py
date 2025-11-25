@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dfxdemo"
-version = "0.29.1"
+version = "0.29.3"
 description = "dfxdemo is a commandline demo for NuraLogix DeepAffex™ technologies."
 readme = "README.md"
 authors = [

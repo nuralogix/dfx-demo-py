@@ -1,5 +1,6 @@
 import cv2
 import mediapipe
+import numpy as np
 from mediapipe.tasks import python as mppython
 
 import os
@@ -33,7 +34,7 @@ class MediaPipeTasksVisionTracker():
         options = mppython.vision.FaceLandmarkerOptions(
             base_options=base_options,
             output_face_blendshapes=False,
-            output_facial_transformation_matrixes=False,
+            output_facial_transformation_matrixes=True,
             num_faces=max_faces,
             min_face_detection_confidence=min_det_conf,
             min_face_presence_confidence=min_track_conf,
@@ -80,7 +81,7 @@ class MediaPipeTasksVisionTracker():
         faces = {}
         for faceNumber, face_landmarks in enumerate(result.face_landmarks):
             tlx, tly, brx, bry = self._findBoundingBox(shape, face_landmarks, 0.05)
-            faces[str(faceNumber + 1)] = {
+            face = {
                 "id": str(faceNumber + 1),
                 "detected": True,
                 "poseValid": True,
@@ -89,7 +90,7 @@ class MediaPipeTasksVisionTracker():
                 "rect.w": brx - tlx,
                 "rect.h": bry - tly,
             }
-            faces[str(faceNumber + 1)].update({
+            face.update({
                 "points": {
                     # Outline
                     "13.1": self._pipe2mpeg4(shape, face_landmarks, 356, 368),
@@ -242,6 +243,34 @@ class MediaPipeTasksVisionTracker():
                     "15.17": self._pipe2mpeg4(shape, face_landmarks, 152),
                 }
             })
+
+            if len(result.facial_transformation_matrixes) > 0:
+                matrix = result.facial_transformation_matrixes[faceNumber]
+                mat = np.array(matrix).reshape((4, 4))
+                rot = mat[:3, :3]
+                trans = mat[:3, 3]  # Extract translation vector
+                # Extract Euler angles (yaw, pitch, roll) from rotation matrix
+                # Assuming rotation order ZYX (yaw, pitch, roll)
+                sy = np.sqrt(rot[0, 0]**2 + rot[1, 0]**2)
+                singular = sy < 1e-6
+                if not singular:
+                    rotation_z = np.arctan2(rot[1, 0], rot[0, 0])
+                    rotation_y = np.arctan2(-rot[2, 0], sy)
+                    rotation_x = np.arctan2(rot[2, 1], rot[2, 2])
+                else:
+                    rotation_z = np.arctan2(-rot[1, 2], rot[1, 1])
+                    rotation_y = np.arctan2(-rot[2, 0], sy)
+                    rotation_x = 0
+                face.update({
+                    "rotation:x": float(rotation_x),
+                    "rotation:y": float(rotation_y),
+                    "rotation:z": float(rotation_z),
+                    "translation:x": float(trans[0]),
+                    "translation:y": float(trans[1]),
+                    "translation:z": float(trans[2]),
+                })
+
+            faces[str(faceNumber + 1)] = face
 
         return faces
 
