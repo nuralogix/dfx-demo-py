@@ -8,12 +8,10 @@ it to the DeepAffex™ Cloud for processing and display the results. (This
 process is called 'making a measurement'.) It can also be used to display
 historical results or to view study details.
 
-## Register for an DeepAffex™ Cloud API license
+## Get a DeepAffex™ Cloud API license
 
-If you haven't already done so, the first step is to register for a DeepAffex™
-developer account and request a cloud API license key. You can do this by
-visiting the [DFX Dashboard](https://dashboard.deepaffex.ai/) and selecting the
-Sign Up link at the bottom.
+To obtain a license, please get in touch with our sales team at
+[nuralogix.ai/get-in-touch](https://www.nuralogix.ai/get-in-touch/).
 
 ## Copy your license key
 
